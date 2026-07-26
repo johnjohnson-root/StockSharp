@@ -24,13 +24,19 @@ tests pass, so the scripting subsystem itself is still exercised. The CLR
 namespace import failure inside the IronPython engine needs investigation;
 until then CI runs with `--filter "FullyQualifiedName!~PythonAnalyticsScripts"`.
 
-## Test host may not exit after the run completes
+## CI hang: resolved (flaky tests, fixed)
 
-On the first CI runs, all 4,365 tests executed (4,361 green) and the test
-host process then sat idle until `--blame-hang` (8 min inactivity) aborted it,
-failing the job. No `new Thread(` exists in this repository, so the
-foreground thread keeping the process alive comes from a dependency.
-Addressed so far: the static `Tests/Helper.cs` `LogManager` is now disposed in
-`[AssemblyCleanup]`, and `SubscriptionHolderTests` no longer creates
-per-holder `LogManager` instances. If the hang recurs, CI now uploads
-`TestResults` (blame sequence files + hang dumps) as artifacts for diagnosis.
+Early CI runs aborted via `--blame-hang` after ~8 minutes of inactivity. The
+blame sequence file identified `AsyncMessageChannelTests.Close_StopsProcessing`
+as the only test still in flight: it polled for the transient
+`ChannelStates.Stopping` with a 10 ms interval, and `AsyncMessageChannel.Close`
+can pass through Stopping to Stopped faster than that — the poll then spins
+forever against a Stopped channel. The test now also accepts Stopped.
+`MessageChannelTests.InMemoryChannel_MessageByLocalTimeQueue_OutOfOrderTimes_SortsCorrectly`
+was similarly racy (channel draining while the shuffled batch was still being
+enqueued, so delivery order could legally interleave); it now suspends the
+channel while enqueueing. These two are the most plausible cause of upstream's
+long-red CI as well. Independently, `Tests/Helper.cs`'s static `LogManager` is
+now disposed in `[AssemblyCleanup]` and `SubscriptionHolderTests` no longer
+leaks per-holder `LogManager` instances. CI uploads `TestResults` (blame
+sequence + hang dumps) on failure should anything recur.

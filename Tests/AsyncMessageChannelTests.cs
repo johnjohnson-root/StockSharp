@@ -483,7 +483,10 @@ public class AsyncMessageChannelTests : BaseTestClass
 		await channel.SendInMessageAsync(new ExecutionMessage(), CancellationToken);
 
 		var closeTask = Task.Run(channel.Close, CancellationToken);
-		while (channel.State != ChannelStates.Stopping)
+		// Stopping is transient (the processor exits promptly and Close then moves
+		// to Stopped), so polling for the exact intermediate state can miss the
+		// window and spin forever
+		while (channel.State is not (ChannelStates.Stopping or ChannelStates.Stopped))
 			await Task.Delay(10, CancellationToken);
 
 		messageRelease.TrySetResult(true);

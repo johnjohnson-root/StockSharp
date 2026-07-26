@@ -605,10 +605,13 @@ public class MessageChannelTests : BaseTestClass
 
 		channel.Open();
 
+		// pause draining so the whole shuffled batch is queued before processing
+		// starts — with the consumer running, delivery order races arrival order
+		channel.Suspend();
+
 		var baseTime = DateTime.UtcNow;
 		var messages = new List<TimeMessage>();
 
-		// Create messages with shuffled times (use seconds to avoid race between enqueue and dequeue)
 		for (int i = 0; i < messageCount; i++)
 		{
 			messages.Add(CreateTimeMessage(baseTime.AddSeconds(i)));
@@ -620,6 +623,8 @@ public class MessageChannelTests : BaseTestClass
 		{
 			await channel.SendInMessageAsync(msg, CancellationToken);
 		}
+
+		channel.Resume();
 
 		await allProcessed.Task.WithCancellation(CancellationToken);
 
