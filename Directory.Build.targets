@@ -1,0 +1,30 @@
+<Project>
+  <!--
+    Pin floating package versions to the newest releases published before
+    2026-07-16 (the last Apache-2.0 commit this fork is based on), so builds
+    are reproducible and do not drift as upstream publishes new binaries.
+    PackageReference Update overrides the Version of references declared in
+    project files without modifying them.
+  -->
+  <ItemGroup>
+    <PackageReference Update="Ecng.Compilation" Version="1.0.319" />
+    <PackageReference Update="Ecng.Compilation.All" Version="1.0.70" />
+    <PackageReference Update="Ecng.Compilation.Roslyn" Version="1.0.317" />
+    <PackageReference Update="Ecng.ComponentModel" Version="1.0.454" />
+    <PackageReference Update="Ecng.Configuration" Version="1.0.267" />
+    <PackageReference Update="Ecng.Data" Version="1.0.461" />
+    <PackageReference Update="Ecng.Data.Ado" Version="1.0.73" />
+    <PackageReference Update="Ecng.Data.SqlServer" Version="1.0.42" />
+    <PackageReference Update="Ecng.Drawing" Version="1.0.180" />
+    <PackageReference Update="Ecng.Excel" Version="1.0.24" />
+    <PackageReference Update="Ecng.Excel.OpenXml" Version="1.0.27" />
+    <PackageReference Update="Ecng.GeneticSharp" Version="1.0.3" />
+    <PackageReference Update="Ecng.IO.Compression" Version="1.0.40" />
+    <PackageReference Update="Ecng.Interop" Version="1.0.331" />
+    <PackageReference Update="Ecng.Linq" Version="1.0.177" />
+    <PackageReference Update="Ecng.Logging" Version="1.0.181" />
+    <PackageReference Update="Ecng.Net" Version="1.0.527" />
+    <PackageReference Update="Ecng.StringSearch" Version="1.0.255" />
+    <PackageReference Update="StockSharp.Samples.HistoryData" Version="5.0.3" />
+  </ItemGroup>
+</Project>

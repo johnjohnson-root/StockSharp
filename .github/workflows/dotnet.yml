@@ -35,4 +35,6 @@ jobs:
         run: dotnet build StockSharp_Tests.slnx --configuration Release
 
       - name: Run tests
-        run: dotnet test StockSharp_Tests.slnx --no-build --configuration Release
+        # --blame-hang names and kills any test that stalls instead of letting
+        # it silently consume the whole job timeout.
+        run: dotnet test StockSharp_Tests.slnx --no-build --configuration Release --blame-hang --blame-hang-timeout 8m
