@@ -17,8 +17,9 @@ public class SubscriptionHolderTests : BaseTestClass
 
 	private static SubscriptionHolder<TestSubscription, string> CreateHolder()
 	{
-		var logger = new LogManager();
-		return new(logger.Application);
+		// a fresh LogManager per holder leaks its flusher and can keep the
+		// test host alive; reuse the shared, assembly-cleaned instance
+		return new(Helper.LogManager.Application);
 	}
 
 	private static TestSubscription CreateSubscription(long id, string session, SecurityId securityId, DataType dataType, SubscriptionStates state = SubscriptionStates.Active)

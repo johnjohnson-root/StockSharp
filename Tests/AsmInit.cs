@@ -34,5 +34,9 @@ public static class AsmInit
 	public static void UnInit()
 	{
 		Helper.FileSystem.ClearTemp();
+
+		// left running, the log flusher can keep the test host process alive
+		// after the run completes
+		Helper.LogManager.Dispose();
 	}
 }

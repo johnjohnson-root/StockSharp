@@ -16,7 +16,7 @@ public static class Paths
 	static Paths()
 	{
 		var companyPath = PathsHolder.CompanyPath ?? ConfigManager.TryGet<string>("companyPath");
-		CompanyPath = companyPath.IsEmpty() ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "StockSharp") : companyPath.ToFullPathIfNeed();
+		CompanyPath = companyPath.IsEmpty() ? Path.Combine(GetDefaultDocumentsRoot(), "StockSharp") : companyPath.ToFullPathIfNeed();
 
 		CredentialsFile = Path.Combine(CompanyPath, $"credentials{DefaultSettingsExt}");
 
@@ -46,6 +46,21 @@ public static class Paths
 		{
 			System.Diagnostics.Trace.WriteLine(ex);
 		}
+	}
+
+	private static string GetDefaultDocumentsRoot()
+	{
+		var root = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+
+		// headless environments (server Linux/macOS, containers, CI) can lack
+		// xdg user dirs, making MyDocuments resolve to an empty string
+		if (root.IsEmpty())
+			root = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+
+		if (root.IsEmpty())
+			root = Environment.GetEnvironmentVariable("HOME") ?? AppContext.BaseDirectory;
+
+		return root;
 	}
 
 	/// <summary>
