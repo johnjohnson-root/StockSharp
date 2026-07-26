@@ -1,37 +1,25 @@
-name: .NET Tests
+name: Build & Tests
+
+# Standalone CI: everything builds from this repository alone — no sibling
+# checkouts, no private repos, no folder-name requirements.
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master, standalone-build ]
   pull_request:
 
 jobs:
   build:
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 10
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
 
     steps:
-      # StockSharp.slnx references the connector projects at ../Connectors/, and the
-      # connectors in turn reference back at ../StockSharp (GitHub)/ — so both repos
-      # must sit side by side and this repo's folder must be named "StockSharp (GitHub)".
-      # Reproduce that layout by checking each repo into its own sibling folder.
-      - name: Checkout StockSharp
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          path: 'StockSharp (GitHub)'
-
-      - name: Checkout Connectors
-        uses: actions/checkout@v4
-        with:
-          repository: StockSharp/Connectors
-          path: Connectors
-          # If StockSharp/Connectors is private, the default token can't read it —
-          # supply a PAT/secret with access:
-          # token: ${{ secrets.CONNECTORS_TOKEN }}
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -40,15 +28,11 @@ jobs:
             6.0.x
             10.0.x
 
-      - name: Build StockSharp.slnx (Windows only)
-        if: matrix.os == 'windows-latest'
-        working-directory: 'StockSharp (GitHub)'
+      - name: Build StockSharp.slnx
         run: dotnet build StockSharp.slnx --configuration Release
 
-      - name: Build
-        working-directory: 'StockSharp (GitHub)'
+      - name: Build tests solution
         run: dotnet build StockSharp_Tests.slnx --configuration Release
 
       - name: Run tests
-        working-directory: 'StockSharp (GitHub)'
         run: dotnet test StockSharp_Tests.slnx --no-build --configuration Release

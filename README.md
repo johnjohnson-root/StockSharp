@@ -6,6 +6,21 @@
 
 ## <a href="https://doc.stocksharp.com/en" style="margin-right:15px;"><img src="https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f4d6.svg" alt="Docs" height="40"/> Docs</a> <a href="https://stocksharp.com/en/products/download/" style="margin-right:15px;"><img src="https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f4be.svg" alt="Download" height="40"/> Download</a> <a href="https://stocksharp.com/en/chat/" style="margin-right:15px;"><img src="https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/1f4ac.svg" alt="Chat" height="40"/> Chat</a> <a href="https://www.youtube.com/@stocksharp"><img src="https://raw.githubusercontent.com/edent/SuperTinyIcons/master/images/svg/youtube.svg" alt="YouTube" height="40"/> YouTube</a>
 
+## About this fork ##
+
+This fork preserves the last **Apache-2.0** licensed state of StockSharp. Upstream replaced the Apache license with a proprietary EULA-based notice on 2026-07-16; this repository's `master` is the direct parent of that change (upstream commit `22ca8fb69`) plus standalone-build fixes, and contains no code from the proprietary era. The `LICENSE` file here remains Apache License 2.0.
+
+### Build from source ###
+
+```
+git clone https://github.com/johnjohnson-root/StockSharp.git
+cd StockSharp
+dotnet build StockSharp.slnx
+dotnet test StockSharp_Tests.slnx
+```
+
+Requires the .NET 10 SDK. Both solutions reference only projects inside this repository — no private sibling repos, no private NuGet feeds, no folder-name requirements. Not included in the solutions: the WPF-only `Media` project, the `Samples` (they reference StockSharp NuGet binaries), and all proprietary connectors/GUI products described below, which were never part of this repository.
+
 ## Introduction ##
 
 **StockSharp** (**S#** for short) – is a **free** platform for trading on any market in the world (crypto exchanges, American, European, Asian, Russian, stocks, futures, options, Bitcoins, forex, etc.). You will be able to trade manually or automatically (algorithmic trading robots, conventional or HFT).
