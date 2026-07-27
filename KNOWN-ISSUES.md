@@ -11,12 +11,17 @@ surfaces 1–3 different failures — observed so far:
 the failed tests once; a test that fails twice fails the job. All tests stay
 active — nothing in the tail is skipped.
 
-`Connection_SubscriptionsCleanedOnDisconnect` deserves a product
-investigation, not just a retry: on one ubuntu run the adapter never observed
-the unsubscribe for a full 15 s after `DisconnectAsync` completed, consistent
-with the pipeline's multicast `Func<..., ValueTask>` events discarding all but
-the last handler's task (see the async fan-out weakness in the architecture
-notes). Suspected real disconnect-cleanup race upstream as well.
+## Fixed here: disconnect could drop queued unsubscribes
+
+`Connection_SubscriptionsCleanedOnDisconnect` occasionally saw the adapter
+never observe an unsubscribe after `DisconnectAsync` completed. Root cause in
+`AsyncMessageChannel`: the scheduler picks control messages first, so a queued
+`DisconnectMessage` overtook older queued unsubscribes — and once disconnect
+starts, the connection-state gate silently drops every remaining non-control
+message. The scheduler now defers disconnect while an older pending
+unsubscribe exists (unsubscribes have no parallel limit, so this cannot
+stall); regression test `Disconnect_DoesNotOvertakeQueuedUnsubscribe`. The
+race still exists upstream.
 
 ## Fixed here: broken priority-queue comparer (message ordering)
 

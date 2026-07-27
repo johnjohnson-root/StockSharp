@@ -503,6 +503,63 @@ public class AsyncMessageChannelTests : BaseTestClass
 	}
 
 	[TestMethod]
+	[Timeout(15000, CooperativeCancellation = true)]
+	public async Task Disconnect_DoesNotOvertakeQueuedUnsubscribe()
+	{
+		var adapter = new PassThroughMessageAdapter(new IncrementalIdGenerator());
+
+		using var channel = new AsyncMessageChannel(adapter);
+
+		var connected = AsyncHelper.CreateTaskCompletionSource<bool>();
+		var disconnected = AsyncHelper.CreateTaskCompletionSource<bool>();
+		var order = new List<MessageTypes>();
+
+		channel.NewOutMessageAsync += (message, token) =>
+		{
+			switch (message)
+			{
+				case ConnectMessage:
+					connected.TrySetResult(true);
+					break;
+				case MarketDataMessage { IsSubscribe: false }:
+					lock (order)
+						order.Add(message.Type);
+					break;
+				case DisconnectMessage:
+					lock (order)
+						order.Add(message.Type);
+					disconnected.TrySetResult(true);
+					break;
+			}
+
+			return default;
+		};
+
+		channel.Open();
+		await channel.SendInMessageAsync(new ConnectMessage(), CancellationToken);
+		await connected.Task.WithCancellation(CancellationToken);
+
+		// pause the processor so both messages sit in the queue together -
+		// the scheduler must then pick the older unsubscribe, not disconnect
+		channel.Suspend();
+		await channel.SendInMessageAsync(new MarketDataMessage
+		{
+			IsSubscribe = false,
+			DataType2 = DataType.Ticks,
+			TransactionId = 2,
+			OriginalTransactionId = 1,
+		}, CancellationToken);
+		await channel.SendInMessageAsync(new DisconnectMessage(), CancellationToken);
+		channel.Resume();
+
+		await disconnected.Task.WithCancellation(CancellationToken);
+
+		order.Count.AssertEqual(2, "Unsubscribe must be delivered, not dropped by disconnect");
+		order[0].AssertEqual(MessageTypes.MarketData);
+		order[1].AssertEqual(MessageTypes.Disconnect);
+	}
+
+	[TestMethod]
 	public async Task Close_CancelsSubscriptions()
 	{
 		var adapter = new PassThroughMessageAdapter(new IncrementalIdGenerator())

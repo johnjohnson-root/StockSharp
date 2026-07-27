@@ -230,6 +230,15 @@ public class AsyncMessageChannel(IMessageAdapter adapter) : Disposable, IMessage
 
 				item = nonProcessing.FirstOrDefault(m => m.IsControl);
 
+				// Disconnect must not overtake pending unsubscribes: once it starts
+				// processing, the connection-state gate below silently drops any
+				// still-queued non-control message, so the adapter would never see
+				// the unsubscribe for an active subscription. Unsubscribes have no
+				// parallel limit and are picked right below, so this cannot stall.
+				if (item?.Message.Type == MessageTypes.Disconnect
+					&& nonProcessing.Any(m => m.Message is ISubscriptionMessage { IsSubscribe: false }))
+					item = null;
+
 				if (item is null)
 				{
 					if (isPingProcessing)
