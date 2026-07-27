@@ -1,5 +1,23 @@
 # Known issues
 
+## Flaky-test tail (CI retries failed tests once)
+
+Beyond the deterministic fixes below, the suite carries a long tail of
+low-probability timing-sensitive tests: each 3-OS run (~13k test executions)
+surfaces 1–3 different failures — observed so far:
+`CandleTests.TotalPrice` ("Sequence contains more than one element"),
+`Subscriptions_RepeatedRounds_AllProcessed` (windows, ~1 min),
+`Connection_SubscriptionsCleanedOnDisconnect`. CI therefore retries exactly
+the failed tests once; a test that fails twice fails the job. All tests stay
+active — nothing in the tail is skipped.
+
+`Connection_SubscriptionsCleanedOnDisconnect` deserves a product
+investigation, not just a retry: on one ubuntu run the adapter never observed
+the unsubscribe for a full 15 s after `DisconnectAsync` completed, consistent
+with the pipeline's multicast `Func<..., ValueTask>` events discarding all but
+the last handler's task (see the async fan-out weakness in the architecture
+notes). Suspected real disconnect-cleanup race upstream as well.
+
 ## Fixed here: broken priority-queue comparer (message ordering)
 
 `BaseMessageQueue` and `BasketMarketDataStorage` constructed

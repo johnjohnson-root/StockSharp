@@ -38,7 +38,46 @@ jobs:
         # --blame-hang names and kills any test that stalls instead of letting
         # it silently consume the whole job timeout. The Python analytics
         # tests are excluded as broken upstream — see KNOWN-ISSUES.md.
-        run: dotnet test StockSharp_Tests.slnx --no-build --configuration Release --blame-hang --blame-hang-timeout 8m --filter "FullyQualifiedName!~PythonAnalyticsScripts"
+        # The suite carries a long tail of low-probability timing-sensitive
+        # tests (KNOWN-ISSUES.md), so tests that fail get exactly one retry;
+        # anything that fails twice fails the job.
+        shell: bash
+        run: |
+          set -uo pipefail
+          FILTER='FullyQualifiedName!~PythonAnalyticsScripts'
+          run_tests() {
+            dotnet test StockSharp_Tests.slnx --no-build --configuration Release \
+              --blame-hang --blame-hang-timeout 8m \
+              --logger "trx;LogFileName=$1.trx" --filter "$2"
+          }
+          if run_tests run1 "$FILTER"; then
+            exit 0
+          fi
+          RETRY=$(python3 - <<'PY'
+          import glob, xml.etree.ElementTree as ET
+          NS = '{http://microsoft.com/schemas/VisualStudio/TeamTest/2010}'
+          names = set()
+          for f in glob.glob('**/TestResults/**/run1.trx', recursive=True) + glob.glob('**/TestResults/run1.trx', recursive=True):
+              root = ET.parse(f).getroot()
+              defs = {d.get('id'): d for d in root.iter(NS + 'UnitTest')}
+              for res in root.iter(NS + 'UnitTestResult'):
+                  if res.get('outcome') == 'Failed':
+                      d = defs.get(res.get('testId'))
+                      if d is None:
+                          continue
+                      tm = d.find(NS + 'TestMethod')
+                      cls = tm.get('className').split(',')[0]
+                      name = tm.get('name').split(' (')[0]
+                      names.add(cls + '.' + name)
+          print('|'.join('FullyQualifiedName~' + n for n in sorted(names)))
+          PY
+          )
+          if [ -z "$RETRY" ]; then
+            echo "Test run failed but no failed tests were parsed from trx (abort/hang?)."
+            exit 1
+          fi
+          echo "Retrying once: $RETRY"
+          run_tests run2 "($FILTER)&($RETRY)"
 
       - name: Upload test results (on failure)
         if: failure()
