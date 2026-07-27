@@ -60,7 +60,7 @@ public interface IMessageQueue : ICloneable<IMessageQueue>
 /// <remarks>
 /// Initializes a new instance of the <see cref="BaseMessageQueue"/> class.
 /// </remarks>
-public abstract class BaseMessageQueue() : BaseOrderedChannel<long, Message, PriorityQueue<long, Message>>(new((p1, p2) => (p1 - p2).Abs()), -1), IMessageQueue
+public abstract class BaseMessageQueue() : BaseOrderedChannel<long, Message, PriorityQueue<long, Message>>(new((p1, p2) => p1 - p2), -1), IMessageQueue
 {
 	/// <inheritdoc />
 	public abstract ValueTask Enqueue(Message message, CancellationToken cancellationToken);

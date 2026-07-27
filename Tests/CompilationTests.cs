@@ -16,6 +16,7 @@ using StockSharp.Algo.Compilation;
 using StockSharp.Diagram;
 
 [TestClass]
+[DoNotParallelize] // IronPython's shared ScriptEngine is not thread-safe
 public class CompilationTests : BaseTestClass
 {
 	// Synchronization object for Python script execution

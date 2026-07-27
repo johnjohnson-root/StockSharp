@@ -49,7 +49,7 @@ public class BasketMarketDataStorage<TMessage> : Disposable, IMarketDataStorage<
 		private readonly CancellationToken _cancellationToken;
 		private readonly SynchronizedQueue<(ActionTypes action, IMarketDataStorage storage, long transId)> _actions = [];
 		private readonly Lock _enumsLock = new();
-		private readonly Ecng.Collections.PriorityQueue<long, (IAsyncEnumerator<Message> enu, IMarketDataStorage storage, long transId)> _enumerators = new((p1, p2) => (p1 - p2).Abs());
+		private readonly Ecng.Collections.PriorityQueue<long, (IAsyncEnumerator<Message> enu, IMarketDataStorage storage, long transId)> _enumerators = new((p1, p2) => p1 - p2);
 
 		private bool _initialized;
 

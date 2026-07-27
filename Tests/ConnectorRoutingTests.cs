@@ -1133,7 +1133,11 @@ public class ConnectorRoutingTests : BaseTestClass
 		// Disconnect - subscriptions should be cleaned up
 		await connector.DisconnectAsync(CancellationToken);
 
-		adapter.ActiveSubscriptionCount.AssertEqual(0);
+		// unsubscribe delivery is asynchronous relative to disconnect completion
+		// (the pipeline does not order them); the [Timeout] above bounds this wait
+		while (adapter.ActiveSubscriptionCount != 0)
+			await Task.Delay(10, CancellationToken);
+
 		adapter.TotalUnsubscribeReceived.AssertGreater(0);
 	}
 

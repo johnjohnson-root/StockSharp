@@ -447,7 +447,9 @@ public class AsyncMessageChannelTests : BaseTestClass
 	{
 		var adapter = new PassThroughMessageAdapter(new IncrementalIdGenerator())
 		{
-			MaxParallelMessages = 2
+			// a single slot guarantees the second message cannot legally start
+			// in parallel before Close - the invariant this test asserts
+			MaxParallelMessages = 1
 		};
 
 		using var channel = new AsyncMessageChannel(adapter);

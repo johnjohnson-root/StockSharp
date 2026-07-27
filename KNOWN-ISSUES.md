@@ -1,5 +1,15 @@
 # Known issues
 
+## Fixed here: broken priority-queue comparer (message ordering)
+
+`BaseMessageQueue` and `BasketMarketDataStorage` constructed
+`Ecng.Collections.PriorityQueue` with the comparer `(p1, p2) => (p1 - p2).Abs()`.
+`Abs()` destroys the sign, so the comparer can never report "less than" and
+heap ordering degenerates to an implementation detail of the resolved
+Ecng.Collections version — `MessageByLocalTimeQueue` delivered a fully
+pre-queued, shuffled batch out of time order in CI. Both sites now use the
+signed difference. Note the `.Abs()` pattern still exists upstream.
+
 Issues inherited from upstream, observed on this fork's CI (GitHub-hosted
 runners, ubuntu/windows/macos). For context: upstream's own CI has produced no
 successful run since 2025-10-27; every upstream master push since then fails
