@@ -41,6 +41,14 @@ partial class Connector
 		=> ApplySubscriptionManagerActions(_subscriptionManager.UnSubscribe(subscription));
 
 	/// <inheritdoc />
+	public ValueTask SubscribeAsync(Subscription subscription, CancellationToken cancellationToken = default)
+		=> ApplySubscriptionManagerActionsAsync(_subscriptionManager.Subscribe(subscription), cancellationToken);
+
+	/// <inheritdoc />
+	public ValueTask UnSubscribeAsync(Subscription subscription, CancellationToken cancellationToken = default)
+		=> ApplySubscriptionManagerActionsAsync(_subscriptionManager.UnSubscribe(subscription), cancellationToken);
+
+	/// <inheritdoc />
 	[Obsolete("Use OwnTradeReceived event.")]
 	public event Action<MyTrade> NewMyTrade;
 

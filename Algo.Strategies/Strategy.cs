@@ -1,4 +1,4 @@
-namespace StockSharp.Algo.Strategies;
+﻿namespace StockSharp.Algo.Strategies;
 
 using StockSharp.Algo.PnL;
 using StockSharp.Algo.Risk;
@@ -833,7 +833,9 @@ public partial class Strategy : BaseLogReceiver, IStrategyHost, IPositionProvide
 
 		OrderProcessor.TryAttach(order);
 		OnOrderRegistering(order);
+#pragma warning disable CS0618 // strategy ordering still drives the sync facade; async migration is follow-up work
 		SubmitNewOrder(order, () => _connector.RegisterOrder(order));
+#pragma warning restore CS0618
 	}
 
 	/// <summary>
@@ -877,7 +879,9 @@ public partial class Strategy : BaseLogReceiver, IStrategyHost, IPositionProvide
 			throw new ArgumentNullException(nameof(order));
 
 		OrderCanceling?.Invoke(order);
+#pragma warning disable CS0618 // strategy ordering still drives the sync facade; async migration is follow-up work
 		_connector.CancelOrder(order);
+#pragma warning restore CS0618
 	}
 
 	/// <summary>
@@ -906,7 +910,9 @@ public partial class Strategy : BaseLogReceiver, IStrategyHost, IPositionProvide
 				return;
 		}
 
+#pragma warning disable CS0618 // strategy ordering still drives the sync facade; async migration is follow-up work
 		_connector.EditOrder(order, changes);
+#pragma warning restore CS0618
 	}
 
 	/// <summary>
@@ -944,7 +950,9 @@ public partial class Strategy : BaseLogReceiver, IStrategyHost, IPositionProvide
 
 		OrderProcessor.TryAttach(newOrder);
 		OnOrderReRegistering(oldOrder, newOrder);
+#pragma warning disable CS0618 // strategy ordering still drives the sync facade; async migration is follow-up work
 		SubmitNewOrder(newOrder, () => _connector.ReRegisterOrder(oldOrder, newOrder));
+#pragma warning restore CS0618
 	}
 
 	/// <summary>

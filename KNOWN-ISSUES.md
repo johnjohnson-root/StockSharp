@@ -1,5 +1,28 @@
 # Known issues
 
+## Fixed here: sync-blocking public facade over the async core
+
+The primary entry points were void methods blocking a thread over the
+ValueTask-native pipeline via AsyncHelper.Run, and the contracts
+(`IConnector`, `ITransactionProvider`, `ISubscriptionProvider`) exposed no
+async members at all. Now: the three interfaces declare `ConnectAsync`,
+`DisconnectAsync`, `RegisterOrderAsync`, `EditOrderAsync`,
+`ReRegisterOrderAsync`, `CancelOrderAsync`, `CancelOrdersAsync`,
+`SubscribeAsync` and `UnSubscribeAsync` — all with `CancellationToken`s —
+with default implementations falling back to the sync members, so existing
+implementers keep compiling; the blocking void members are `[Obsolete]` at
+the interface level. `Connector` implements the new members without blocking
+(`ConnectAsync`/`DisconnectAsync` await the pipeline and complete on the
+`Connected`/`Disconnected`/`ConnectionError` events;
+`SubscribeAsync`/`UnSubscribeAsync` route through
+`ApplySubscriptionManagerActionsAsync`). The former
+`IConnectorAsyncExtensions.ConnectAsync/DisconnectAsync` extensions are
+superseded by the instance members (same semantics); the subscription
+keep-alive extension is renamed `HoldSubscriptionAsync` to free the
+`SubscribeAsync` name. Left for follow-up: `Strategy`'s ordering internals
+still drive the sync facade (pragma-marked), and the remaining
+`AsyncHelper.Run` shims in the void members stay until callers migrate.
+
 ## Flaky-test tail (CI retries failed tests once)
 
 Beyond the deterministic fixes below, the suite carries a long tail of

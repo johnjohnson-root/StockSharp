@@ -1,4 +1,4 @@
-namespace StockSharp.BusinessEntities;
+﻿namespace StockSharp.BusinessEntities;
 
 /// <summary>
 /// Transactional operations provider interface.
@@ -88,6 +88,7 @@ public interface ITransactionProvider
 	/// Register new order.
 	/// </summary>
 	/// <param name="order">Registration details.</param>
+	[Obsolete("Use RegisterOrderAsync instead.")]
 	void RegisterOrder(Order order);
 
 	/// <summary>
@@ -95,6 +96,7 @@ public interface ITransactionProvider
 	/// </summary>
 	/// <param name="order">Order.</param>
 	/// <param name="changes">Order changes.</param>
+	[Obsolete("Use EditOrderAsync instead.")]
 	void EditOrder(Order order, Order changes);
 
 	/// <summary>
@@ -102,12 +104,14 @@ public interface ITransactionProvider
 	/// </summary>
 	/// <param name="oldOrder">Cancelling order.</param>
 	/// <param name="newOrder">New order to register.</param>
+	[Obsolete("Use ReRegisterOrderAsync instead.")]
 	void ReRegisterOrder(Order oldOrder, Order newOrder);
 
 	/// <summary>
 	/// Cancel the order.
 	/// </summary>
 	/// <param name="order">The order which should be canceled.</param>
+	[Obsolete("Use CancelOrderAsync instead.")]
 	void CancelOrder(Order order);
 
 	/// <summary>
@@ -120,7 +124,86 @@ public interface ITransactionProvider
 	/// <param name="security">Instrument. If the value is equal to <see langword="null" />, then the instrument does not match the orders cancel filter.</param>
 	/// <param name="securityType">Security type. If the value is <see langword="null" />, the type does not use.</param>
 	/// <param name="transactionId">Order cancellation transaction id.</param>
+	[Obsolete("Use CancelOrdersAsync instead.")]
 	void CancelOrders(bool? isStopOrder = null, Portfolio portfolio = null, Sides? direction = null, ExchangeBoard board = null, Security security = null, SecurityTypes? securityType = null, long? transactionId = null);
+
+	/// <summary>
+	/// Register new order without blocking the calling thread.
+	/// </summary>
+	/// <param name="order">Registration details.</param>
+	/// <param name="cancellationToken"><see cref="CancellationToken"/>.</param>
+	/// <returns><see cref="ValueTask"/>.</returns>
+	ValueTask RegisterOrderAsync(Order order, CancellationToken cancellationToken)
+	{
+#pragma warning disable CS0618 // fallback for implementations without a dedicated async path
+		RegisterOrder(order);
+#pragma warning restore CS0618
+		return default;
+	}
+
+	/// <summary>
+	/// Edit the order without blocking the calling thread.
+	/// </summary>
+	/// <param name="order">Order.</param>
+	/// <param name="changes">Order changes.</param>
+	/// <param name="cancellationToken"><see cref="CancellationToken"/>.</param>
+	/// <returns><see cref="ValueTask"/>.</returns>
+	ValueTask EditOrderAsync(Order order, Order changes, CancellationToken cancellationToken)
+	{
+#pragma warning disable CS0618 // fallback for implementations without a dedicated async path
+		EditOrder(order, changes);
+#pragma warning restore CS0618
+		return default;
+	}
+
+	/// <summary>
+	/// Reregister the order without blocking the calling thread.
+	/// </summary>
+	/// <param name="oldOrder">Cancelling order.</param>
+	/// <param name="newOrder">New order to register.</param>
+	/// <param name="cancellationToken"><see cref="CancellationToken"/>.</param>
+	/// <returns><see cref="ValueTask"/>.</returns>
+	ValueTask ReRegisterOrderAsync(Order oldOrder, Order newOrder, CancellationToken cancellationToken)
+	{
+#pragma warning disable CS0618 // fallback for implementations without a dedicated async path
+		ReRegisterOrder(oldOrder, newOrder);
+#pragma warning restore CS0618
+		return default;
+	}
+
+	/// <summary>
+	/// Cancel the order without blocking the calling thread.
+	/// </summary>
+	/// <param name="order">The order which should be canceled.</param>
+	/// <param name="cancellationToken"><see cref="CancellationToken"/>.</param>
+	/// <returns><see cref="ValueTask"/>.</returns>
+	ValueTask CancelOrderAsync(Order order, CancellationToken cancellationToken)
+	{
+#pragma warning disable CS0618 // fallback for implementations without a dedicated async path
+		CancelOrder(order);
+#pragma warning restore CS0618
+		return default;
+	}
+
+	/// <summary>
+	/// Cancel orders by filter without blocking the calling thread.
+	/// </summary>
+	/// <param name="isStopOrder"><see langword="true" />, if cancel only a stop orders, <see langword="false" /> - if regular orders, <see langword="null" /> - both.</param>
+	/// <param name="portfolio">Portfolio. If the value is equal to <see langword="null" />, then the portfolio does not match the orders cancel filter.</param>
+	/// <param name="direction">Order side. If the value is <see langword="null" />, the direction does not use.</param>
+	/// <param name="board">Trading board. If the value is equal to <see langword="null" />, then the board does not match the orders cancel filter.</param>
+	/// <param name="security">Instrument. If the value is equal to <see langword="null" />, then the instrument does not match the orders cancel filter.</param>
+	/// <param name="securityType">Security type. If the value is <see langword="null" />, the type does not use.</param>
+	/// <param name="transactionId">Order cancellation transaction id.</param>
+	/// <param name="cancellationToken"><see cref="CancellationToken"/>.</param>
+	/// <returns><see cref="ValueTask"/>.</returns>
+	ValueTask CancelOrdersAsync(bool? isStopOrder = null, Portfolio portfolio = null, Sides? direction = null, ExchangeBoard board = null, Security security = null, SecurityTypes? securityType = null, long? transactionId = null, CancellationToken cancellationToken = default)
+	{
+#pragma warning disable CS0618 // fallback for implementations without a dedicated async path
+		CancelOrders(isStopOrder, portfolio, direction, board, security, securityType, transactionId);
+#pragma warning restore CS0618
+		return default;
+	}
 
 	/// <summary>
 	/// Determines the specified order can be edited by <see cref="EditOrder"/>.

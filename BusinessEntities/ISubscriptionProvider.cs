@@ -1,4 +1,4 @@
-namespace StockSharp.BusinessEntities;
+﻿namespace StockSharp.BusinessEntities;
 
 /// <summary>
 /// Subscription provider interface.
@@ -144,11 +144,47 @@ public interface ISubscriptionProvider
 	/// Subscribe.
 	/// </summary>
 	/// <param name="subscription">Subscription.</param>
+	[Obsolete("Use SubscribeAsync instead.")]
 	void Subscribe(Subscription subscription);
 
 	/// <summary>
 	/// Unsubscribe.
 	/// </summary>
 	/// <param name="subscription">Subscription.</param>
+	[Obsolete("Use UnSubscribeAsync instead.")]
 	void UnSubscribe(Subscription subscription);
+
+	/// <summary>
+	/// Subscribe without blocking the calling thread.
+	/// </summary>
+	/// <remarks>
+	/// Completes when the request has been handed to the pipeline; track the
+	/// subscription lifecycle via <see cref="SubscriptionStarted"/>,
+	/// <see cref="SubscriptionFailed"/> and <see cref="SubscriptionStopped"/>.
+	/// Implementations without a dedicated async path fall back to <see cref="Subscribe"/>.
+	/// </remarks>
+	/// <param name="subscription">Subscription.</param>
+	/// <param name="cancellationToken"><see cref="CancellationToken"/>.</param>
+	/// <returns><see cref="ValueTask"/>.</returns>
+	ValueTask SubscribeAsync(Subscription subscription, CancellationToken cancellationToken)
+	{
+#pragma warning disable CS0618 // fallback for implementations without a dedicated async path
+		Subscribe(subscription);
+#pragma warning restore CS0618
+		return default;
+	}
+
+	/// <summary>
+	/// Unsubscribe without blocking the calling thread.
+	/// </summary>
+	/// <param name="subscription">Subscription.</param>
+	/// <param name="cancellationToken"><see cref="CancellationToken"/>.</param>
+	/// <returns><see cref="ValueTask"/>.</returns>
+	ValueTask UnSubscribeAsync(Subscription subscription, CancellationToken cancellationToken)
+	{
+#pragma warning disable CS0618 // fallback for implementations without a dedicated async path
+		UnSubscribe(subscription);
+#pragma warning restore CS0618
+		return default;
+	}
 }

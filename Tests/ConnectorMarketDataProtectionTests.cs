@@ -1,4 +1,4 @@
-namespace StockSharp.Tests;
+﻿namespace StockSharp.Tests;
 
 using StockSharp.Algo.Basket;
 using StockSharp.Algo.Candles.Compression;
@@ -176,7 +176,7 @@ public class ConnectorMarketDataProtectionTests : BaseTestClass
 		var started = AsyncHelper.CreateTaskCompletionSource<bool>();
 		connector.SubscriptionStarted += s => { if (ReferenceEquals(s, sub)) started.TrySetResult(true); };
 
-		_ = connector.SubscribeAsync(sub, cancellationToken).AsTask();
+		_ = connector.HoldSubscriptionAsync(sub, cancellationToken).AsTask();
 		await started.Task.WithCancellation(cancellationToken);
 
 		return adapter.LastSubscribedId;

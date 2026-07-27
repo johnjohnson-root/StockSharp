@@ -1,4 +1,4 @@
-namespace StockSharp.BusinessEntities;
+﻿namespace StockSharp.BusinessEntities;
 
 /// <summary>
 /// The main interface providing the connection to the trading systems.
@@ -91,12 +91,86 @@ public interface IConnector : IMessageTransport, IPersistable, ILogReceiver,
 	/// <summary>
 	/// Connect to trading system.
 	/// </summary>
+	[Obsolete("Use ConnectAsync instead.")]
 	void Connect();
 
 	/// <summary>
 	/// Disconnect from trading system.
 	/// </summary>
+	[Obsolete("Use DisconnectAsync instead.")]
 	void Disconnect();
+
+	/// <summary>
+	/// Connect to trading system and await the result: completes when
+	/// <see cref="Connected"/> or fails when <see cref="ConnectionError"/> is raised.
+	/// </summary>
+	/// <param name="cancellationToken"><see cref="CancellationToken"/>.</param>
+	/// <returns><see cref="ValueTask"/>.</returns>
+	async ValueTask ConnectAsync(CancellationToken cancellationToken)
+	{
+		if (ConnectionState != ConnectionStates.Disconnected)
+			throw new InvalidOperationException($"State is {ConnectionState}.");
+
+		var tcs = AsyncHelper.CreateTaskCompletionSource<bool>();
+
+		using var _ = cancellationToken.Register(() => tcs.TrySetCanceled(cancellationToken));
+
+		void onConnected() => tcs.TrySetResult(true);
+		void onError(Exception ex) => tcs.TrySetException(ex);
+
+		Connected += onConnected;
+		ConnectionError += onError;
+
+		try
+		{
+#pragma warning disable CS0618 // fallback via the deprecated sync method
+			Connect();
+#pragma warning restore CS0618
+
+			await tcs.Task;
+		}
+		finally
+		{
+			Connected -= onConnected;
+			ConnectionError -= onError;
+		}
+	}
+
+	/// <summary>
+	/// Disconnect from trading system and await the result: completes when
+	/// <see cref="Disconnected"/> or fails when <see cref="ConnectionError"/> is raised.
+	/// </summary>
+	/// <param name="cancellationToken"><see cref="CancellationToken"/>.</param>
+	/// <returns><see cref="ValueTask"/>.</returns>
+	async ValueTask DisconnectAsync(CancellationToken cancellationToken)
+	{
+		if (ConnectionState != ConnectionStates.Connected)
+			throw new InvalidOperationException($"State is {ConnectionState}.");
+
+		var tcs = AsyncHelper.CreateTaskCompletionSource<bool>();
+
+		using var _ = cancellationToken.Register(() => tcs.TrySetCanceled(cancellationToken));
+
+		void onDisconnected() => tcs.TrySetResult(true);
+		void onError(Exception ex) => tcs.TrySetException(ex);
+
+		Disconnected += onDisconnected;
+		ConnectionError += onError;
+
+		try
+		{
+#pragma warning disable CS0618 // fallback via the deprecated sync method
+			Disconnect();
+#pragma warning restore CS0618
+
+			await tcs.Task;
+		}
+		finally
+		{
+			Disconnected -= onDisconnected;
+			ConnectionError -= onError;
+		}
+	}
 
 	/// <summary>
 	/// Get <see cref="SecurityId"/>.

@@ -1,4 +1,4 @@
-namespace StockSharp.Algo.Strategies;
+﻿namespace StockSharp.Algo.Strategies;
 
 partial class StrategyOld
 {
@@ -136,7 +136,9 @@ partial class StrategyOld
 			return;
 		}
 
-		connector.Subscribe(subscription);
+		#pragma warning disable CS0618 // sync helper retained; async counterpart is the new API
+	connector.Subscribe(subscription);
+#pragma warning restore CS0618
 	}
 
 	/// <inheritdoc />
@@ -157,7 +159,9 @@ partial class StrategyOld
 			_subscriptions.Remove(subscription);
 			_subscriptionsById.Remove(subscription.TransactionId);
 
-			connector.UnSubscribe(subscription);
+			#pragma warning disable CS0618 // sync helper retained; async counterpart is the new API
+	connector.UnSubscribe(subscription);
+#pragma warning restore CS0618
 			return;
 		}
 
@@ -168,7 +172,9 @@ partial class StrategyOld
 			return;
 		}
 
-		connector.UnSubscribe(subscription);
+		#pragma warning disable CS0618 // sync helper retained; async counterpart is the new API
+	connector.UnSubscribe(subscription);
+#pragma warning restore CS0618
 	}
 
 	private void OnConnectorSubscriptionFailed(Subscription subscription, Exception error, bool isSubscribe)

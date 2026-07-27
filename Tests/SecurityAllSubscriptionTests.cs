@@ -1,4 +1,4 @@
-namespace StockSharp.Tests;
+﻿namespace StockSharp.Tests;
 
 /// <summary>
 /// Integration tests for SecurityAll subscription flow through the full Connector adapter chain.
@@ -194,7 +194,7 @@ public class SecurityAllSubscriptionTests : BaseTestClass
 		connector.SubscriptionStarted += s => { if (ReferenceEquals(s, sub)) started.TrySetResult(true); };
 
 		using var runCts = new CancellationTokenSource();
-		var run = connector.SubscribeAsync(sub, runCts.Token).AsTask();
+		var run = connector.HoldSubscriptionAsync(sub, runCts.Token).AsTask();
 		await started.Task.WithCancellation(CancellationToken);
 
 		var subId = await WaitForSubscription(adapter, CancellationToken);
@@ -238,7 +238,7 @@ public class SecurityAllSubscriptionTests : BaseTestClass
 		connector.SubscriptionStarted += s => { if (ReferenceEquals(s, sub)) started.TrySetResult(true); };
 
 		using var runCts = new CancellationTokenSource();
-		var run = connector.SubscribeAsync(sub, runCts.Token).AsTask();
+		var run = connector.HoldSubscriptionAsync(sub, runCts.Token).AsTask();
 		await started.Task.WithCancellation(CancellationToken);
 
 		var subId = await WaitForSubscription(adapter, CancellationToken);
@@ -288,7 +288,7 @@ public class SecurityAllSubscriptionTests : BaseTestClass
 		connector.SubscriptionStarted += s => { if (ReferenceEquals(s, sub)) started.TrySetResult(true); };
 
 		using var runCts = new CancellationTokenSource();
-		var run = connector.SubscribeAsync(sub, runCts.Token).AsTask();
+		var run = connector.HoldSubscriptionAsync(sub, runCts.Token).AsTask();
 		await started.Task.WithCancellation(CancellationToken);
 
 		var subId = await WaitForSubscription(adapter, CancellationToken);
@@ -338,7 +338,7 @@ public class SecurityAllSubscriptionTests : BaseTestClass
 		connector.SubscriptionStarted += s => { if (ReferenceEquals(s, sub)) started.TrySetResult(true); };
 
 		using var runCts = new CancellationTokenSource();
-		var run = connector.SubscribeAsync(sub, runCts.Token).AsTask();
+		var run = connector.HoldSubscriptionAsync(sub, runCts.Token).AsTask();
 		await started.Task.WithCancellation(CancellationToken);
 
 		var subId = await WaitForSubscription(adapter, CancellationToken);
@@ -381,7 +381,7 @@ public class SecurityAllSubscriptionTests : BaseTestClass
 		connector.SubscriptionStarted += s => { if (ReferenceEquals(s, sub)) started.TrySetResult(true); };
 
 		using var runCts = new CancellationTokenSource();
-		var run = connector.SubscribeAsync(sub, runCts.Token).AsTask();
+		var run = connector.HoldSubscriptionAsync(sub, runCts.Token).AsTask();
 		await started.Task.WithCancellation(CancellationToken);
 
 		var subId = await WaitForSubscription(adapter, CancellationToken);
@@ -447,7 +447,7 @@ public class SecurityAllSubscriptionTests : BaseTestClass
 		connector.SubscriptionStarted += s => { if (ReferenceEquals(s, aaplSub)) aaplStarted.TrySetResult(true); };
 
 		using var aaplCts = new CancellationTokenSource();
-		var aaplRun = connector.SubscribeAsync(aaplSub, aaplCts.Token).AsTask();
+		var aaplRun = connector.HoldSubscriptionAsync(aaplSub, aaplCts.Token).AsTask();
 		await aaplStarted.Task.WithCancellation(CancellationToken);
 
 		var subId = await WaitForSubscription(adapter, CancellationToken);
@@ -476,7 +476,7 @@ public class SecurityAllSubscriptionTests : BaseTestClass
 		connector.SubscriptionStarted += s => { if (ReferenceEquals(s, googSub)) googStarted.TrySetResult(true); };
 
 		using var googCts = new CancellationTokenSource();
-		var googRun = connector.SubscribeAsync(googSub, googCts.Token).AsTask();
+		var googRun = connector.HoldSubscriptionAsync(googSub, googCts.Token).AsTask();
 
 		// Wait — no new data emitted by adapter after this point
 		await googStarted.Task.WithCancellation(CancellationToken);

@@ -1,4 +1,4 @@
-namespace StockSharp.Algo.Strategies;
+﻿namespace StockSharp.Algo.Strategies;
 
 using StockSharp.Algo.PnL;
 using StockSharp.Algo.Risk;
@@ -1504,7 +1504,9 @@ public partial class StrategyOld : BaseLogReceiver, INotifyPropertyChangedEx, IM
 		{
 			OnOrderRegistering(nOrder);
 
+#pragma warning disable CS0618 // strategy ordering still drives the sync facade; async migration is follow-up work
 			SafeGetConnector().RegisterOrder(nOrder);
+#pragma warning restore CS0618
 		});
 	}
 
@@ -1528,7 +1530,9 @@ public partial class StrategyOld : BaseLogReceiver, INotifyPropertyChangedEx, IM
 		var action = ProcessRisk(() => order.CreateReplaceMessage(changes, order.Security.ToSecurityId()));
 
 		if (action is null)
+#pragma warning disable CS0618 // strategy ordering still drives the sync facade; async migration is follow-up work
 			SafeGetConnector().EditOrder(order, changes);
+#pragma warning restore CS0618
 	}
 
 	/// <inheritdoc />
@@ -1560,7 +1564,9 @@ public partial class StrategyOld : BaseLogReceiver, INotifyPropertyChangedEx, IM
 		{
 			OnOrderReRegistering(oOrder, nOrder);
 
+#pragma warning disable CS0618 // strategy ordering still drives the sync facade; async migration is follow-up work
 			SafeGetConnector().ReRegisterOrder(oOrder, nOrder);
+#pragma warning restore CS0618
 		});
 	}
 
@@ -1739,7 +1745,9 @@ public partial class StrategyOld : BaseLogReceiver, INotifyPropertyChangedEx, IM
 
 		OrderCanceling?.Invoke(order);
 
+#pragma warning disable CS0618 // strategy ordering still drives the sync facade; async migration is follow-up work
 		SafeGetConnector().CancelOrder(order);
+#pragma warning restore CS0618
 	}
 
 	/// <summary>

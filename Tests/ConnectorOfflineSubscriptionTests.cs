@@ -1,4 +1,4 @@
-namespace StockSharp.Tests;
+﻿namespace StockSharp.Tests;
 
 using System.Collections.Concurrent;
 
@@ -224,7 +224,7 @@ public class ConnectorOfflineSubscriptionTests : BaseTestClass
 		var sub = new Subscription(DataType.Level1, new Security { Id = secId.ToStringId() });
 
 		// Subscribe BEFORE connect — should be pended in BasketMessageAdapter
-		_ = connector.SubscribeAsync(sub, CancellationToken).AsTask();
+		_ = connector.HoldSubscriptionAsync(sub, CancellationToken).AsTask();
 
 		state.PendingState.Count.AssertGreater(0,
 			"Subscription should be pended when no adapter is connected");
@@ -263,7 +263,7 @@ public class ConnectorOfflineSubscriptionTests : BaseTestClass
 		var sub = new Subscription(DataType.Level1);
 
 		// Subscribe ALL before connect
-		_ = connector.SubscribeAsync(sub, CancellationToken).AsTask();
+		_ = connector.HoldSubscriptionAsync(sub, CancellationToken).AsTask();
 
 		state.PendingState.Count.AssertGreater(0,
 			"Subscription should be pended when no adapters are connected");
@@ -307,7 +307,7 @@ public class ConnectorOfflineSubscriptionTests : BaseTestClass
 		var sub = new Subscription(DataType.Level1, new Security { Id = secId.ToStringId() });
 
 		// Subscribe while disconnected — OfflineMessageAdapter should buffer
-		_ = connector.SubscribeAsync(sub, CancellationToken).AsTask();
+		_ = connector.HoldSubscriptionAsync(sub, CancellationToken).AsTask();
 
 		adapter.RecordedSubscriptions.Count.AssertEqual(0,
 			"Mock adapter should NOT receive subscription during connection loss");
@@ -343,7 +343,7 @@ public class ConnectorOfflineSubscriptionTests : BaseTestClass
 
 		var started = AsyncHelper.CreateTaskCompletionSource<bool>();
 		connector.SubscriptionStarted += s => { if (ReferenceEquals(s, sub)) started.TrySetResult(true); };
-		_ = connector.SubscribeAsync(sub, CancellationToken).AsTask();
+		_ = connector.HoldSubscriptionAsync(sub, CancellationToken).AsTask();
 		await started.Task.WithCancellation(CancellationToken);
 
 		adapter.RecordedSubscriptions.Count.AssertGreater(0,

@@ -1,4 +1,4 @@
-namespace StockSharp.BusinessEntities;
+﻿namespace StockSharp.BusinessEntities;
 
 using System.Reflection;
 
@@ -2344,12 +2344,14 @@ public static partial class EntitiesExtensions
 		if (news is null)
 			throw new ArgumentNullException(nameof(news));
 
+#pragma warning disable CS0618 // sync helper retained; async counterpart is the new API
 		provider.Subscribe(new(new MarketDataMessage
 		{
 			DataType2 = DataType.News,
 			IsSubscribe = true,
 			NewsId = news.Id.To<string>(),
 		}));
+#pragma warning restore CS0618
 	}
 
 	/// <summary>

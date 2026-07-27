@@ -1,4 +1,4 @@
-namespace StockSharp.Tests;
+﻿namespace StockSharp.Tests;
 
 using System.Collections.Concurrent;
 
@@ -654,7 +654,7 @@ public class AsyncExtensionsTests : BaseTestClass
 		connector.SubscriptionStarted += s => { if (ReferenceEquals(s, sub)) started.TrySetResult(true); };
 
 		using var runCts = new CancellationTokenSource();
-		var run = connector.SubscribeAsync(sub, runCts.Token).AsTask();
+		var run = connector.HoldSubscriptionAsync(sub, runCts.Token).AsTask();
 
 		await started.Task.WithCancellation(CancellationToken);
 

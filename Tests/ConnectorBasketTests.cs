@@ -1,4 +1,4 @@
-namespace StockSharp.Tests;
+﻿namespace StockSharp.Tests;
 
 using System.Collections.Concurrent;
 
@@ -458,7 +458,7 @@ public class ConnectorBasketTests : BaseTestClass
 		connector.SubscriptionStarted += s => { if (ReferenceEquals(s, sub)) started.TrySetResult(true); };
 
 		using var runCts = new CancellationTokenSource();
-		var run = connector.SubscribeAsync(sub, runCts.Token).AsTask();
+		var run = connector.HoldSubscriptionAsync(sub, runCts.Token).AsTask();
 
 		await started.Task.WithCancellation(CancellationToken);
 
@@ -1158,7 +1158,7 @@ public class ConnectorBasketTests : BaseTestClass
 		};
 
 		using var runCts = new CancellationTokenSource();
-		var run = connector.SubscribeAsync(sub, runCts.Token);
+		var run = connector.HoldSubscriptionAsync(sub, runCts.Token);
 
 		await Task.Run(async () =>
 		{
@@ -1205,7 +1205,7 @@ public class ConnectorBasketTests : BaseTestClass
 		var sub = new Subscription(DataType.Ticks, security);
 
 		using var runCts = new CancellationTokenSource();
-		var run = connector.SubscribeAsync(sub, runCts.Token);
+		var run = connector.HoldSubscriptionAsync(sub, runCts.Token);
 
 		await Task.Run(async () =>
 		{
@@ -1243,7 +1243,7 @@ public class ConnectorBasketTests : BaseTestClass
 		var sub = new Subscription(DataType.Level1, security);
 
 		using var runCts = new CancellationTokenSource();
-		var run = connector.SubscribeAsync(sub, runCts.Token);
+		var run = connector.HoldSubscriptionAsync(sub, runCts.Token);
 
 		await Task.Run(async () =>
 		{

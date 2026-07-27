@@ -1,4 +1,4 @@
-namespace StockSharp.BusinessEntities;
+﻿namespace StockSharp.BusinessEntities;
 
 using System.Runtime.CompilerServices;
 using System.Threading.Channels;
@@ -67,7 +67,7 @@ public static class ISubscriptionProviderAsyncExtensions
 
 		try
 		{
-			provider.Subscribe(subscription);
+			await provider.SubscribeAsync(subscription, cancellationToken);
 
 			await using var enumerator = channel.Reader.ReadAllAsync(cancellationToken).GetAsyncEnumerator(cancellationToken);
 
@@ -101,7 +101,9 @@ public static class ISubscriptionProviderAsyncExtensions
 			// the registered callback runs, so issue the unsubscribe from the finally that always runs.
 			if (cancellationToken.IsCancellationRequested)
 			{
-				try { provider.UnSubscribe(subscription); }
+				#pragma warning disable CS0618 // sync path: cannot await here
+			try { provider.UnSubscribe(subscription); }
+#pragma warning restore CS0618
 				catch { /* ignore */ }
 			}
 		}
@@ -115,7 +117,7 @@ public static class ISubscriptionProviderAsyncExtensions
 	/// <param name="subscription">Subscription to manage.</param>
 	/// <param name="cancellationToken">Cancellation token that triggers unsubscription.</param>
 	/// <returns>A <see cref="ValueTask"/> that completes after the subscription is stopped (due to cancellation or failure).</returns>
-	public static async ValueTask SubscribeAsync(
+	public static async ValueTask HoldSubscriptionAsync(
 		this ISubscriptionProvider provider,
 		Subscription subscription,
 		CancellationToken cancellationToken)
@@ -140,13 +142,15 @@ public static class ISubscriptionProviderAsyncExtensions
 
 		var ctr = cancellationToken.Register(() =>
 		{
+			#pragma warning disable CS0618 // sync path: cannot await here
 			try { provider.UnSubscribe(subscription); }
+#pragma warning restore CS0618
 			finally { cancelTcs.TrySetResult(true); }
 		});
 
 		try
 		{
-			provider.Subscribe(subscription);
+			await provider.SubscribeAsync(subscription, cancellationToken);
 
 			var first = await Task.WhenAny(startedTcs.Task, failedTcs.Task, cancelTcs.Task).NoWait();
 			

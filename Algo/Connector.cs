@@ -1,4 +1,4 @@
-namespace StockSharp.Algo;
+﻿namespace StockSharp.Algo;
 
 using System.Security;
 
@@ -448,6 +448,55 @@ public partial class Connector : BaseLogReceiver, IConnector
 	}
 
 	/// <summary>
+	/// Connect to trading system and await the result without blocking a thread:
+	/// completes when <see cref="Connected"/> or fails when <see cref="ConnectionError"/> is raised.
+	/// </summary>
+	/// <param name="cancellationToken"><see cref="CancellationToken"/>.</param>
+	/// <returns><see cref="ValueTask"/>.</returns>
+	public async ValueTask ConnectAsync(CancellationToken cancellationToken = default)
+	{
+		LogInfo(nameof(ConnectAsync));
+
+		if (ConnectionState is not ConnectionStates.Disconnected and not ConnectionStates.Failed)
+			throw new InvalidOperationException($"State is {ConnectionState}.");
+
+		var tcs = AsyncHelper.CreateTaskCompletionSource<bool>();
+
+		using var _ = cancellationToken.Register(() => tcs.TrySetCanceled(cancellationToken));
+
+		void onConnected() => tcs.TrySetResult(true);
+		void onError(Exception ex) => tcs.TrySetException(ex);
+
+		Connected += onConnected;
+		ConnectionError += onError;
+
+		try
+		{
+			ConnectionState = ConnectionStates.Connecting;
+
+			try
+			{
+				await OnConnectAsync(cancellationToken);
+			}
+			catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+			{
+				throw;
+			}
+			catch (Exception ex)
+			{
+				RaiseConnectionError(ex);
+			}
+
+			await tcs.Task;
+		}
+		finally
+		{
+			Connected -= onConnected;
+			ConnectionError -= onError;
+		}
+	}
+
+	/// <summary>
 	/// Connect to trading system.
 	/// </summary>
 	protected virtual ValueTask OnConnectAsync(CancellationToken cancellationToken)
@@ -481,6 +530,55 @@ public partial class Connector : BaseLogReceiver, IConnector
 		catch (Exception ex)
 		{
 			RaiseConnectionError(ex);
+		}
+	}
+
+	/// <summary>
+	/// Disconnect from trading system and await the result without blocking a thread:
+	/// completes when <see cref="Disconnected"/> or fails when <see cref="ConnectionError"/> is raised.
+	/// </summary>
+	/// <param name="cancellationToken"><see cref="CancellationToken"/>.</param>
+	/// <returns><see cref="ValueTask"/>.</returns>
+	public async ValueTask DisconnectAsync(CancellationToken cancellationToken = default)
+	{
+		LogInfo(nameof(DisconnectAsync));
+
+		if (ConnectionState != ConnectionStates.Connected)
+			throw new InvalidOperationException($"State is {ConnectionState}.");
+
+		var tcs = AsyncHelper.CreateTaskCompletionSource<bool>();
+
+		using var _ = cancellationToken.Register(() => tcs.TrySetCanceled(cancellationToken));
+
+		void onDisconnected() => tcs.TrySetResult(true);
+		void onError(Exception ex) => tcs.TrySetException(ex);
+
+		Disconnected += onDisconnected;
+		ConnectionError += onError;
+
+		try
+		{
+			ConnectionState = ConnectionStates.Disconnecting;
+
+			try
+			{
+				await OnDisconnectAsync(cancellationToken);
+			}
+			catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+			{
+				throw;
+			}
+			catch (Exception ex)
+			{
+				RaiseConnectionError(ex);
+			}
+
+			await tcs.Task;
+		}
+		finally
+		{
+			Disconnected -= onDisconnected;
+			ConnectionError -= onError;
 		}
 	}
 
