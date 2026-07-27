@@ -808,6 +808,32 @@ public partial class Strategy : BaseLogReceiver, IStrategyHost, IPositionProvide
 	/// </summary>
 	public void RegisterOrder(Order order)
 	{
+		if (!TryPrepareRegister(order))
+			return;
+
+#pragma warning disable CS0618 // sync entry point retained; use RegisterOrderAsync to avoid blocking
+		SubmitNewOrder(order, () => _connector.RegisterOrder(order));
+#pragma warning restore CS0618
+	}
+
+	/// <summary>
+	/// Async version of <see cref="RegisterOrder"/>: completes when the registration
+	/// request has been handed to the connector pipeline. Track the order lifecycle
+	/// via events or rules.
+	/// </summary>
+	/// <param name="order">Registration details.</param>
+	/// <param name="cancellationToken"><see cref="CancellationToken"/>.</param>
+	/// <returns><see cref="ValueTask"/>.</returns>
+	public ValueTask RegisterOrderAsync(Order order, CancellationToken cancellationToken = default)
+	{
+		if (!TryPrepareRegister(order))
+			return default;
+
+		return SubmitNewOrderAsync(order, () => _connector.RegisterOrderAsync(order, cancellationToken));
+	}
+
+	private bool TryPrepareRegister(Order order)
+	{
 		if (order is null)
 			throw new ArgumentNullException(nameof(order));
 
@@ -821,21 +847,19 @@ public partial class Strategy : BaseLogReceiver, IStrategyHost, IPositionProvide
 			{
 				// A risk rule fired: veto the triggering order, it must not reach the connector.
 				ProcessOrderFail(order, new InvalidOperationException(action.Value.GetFieldDisplayName()));
-				return;
+				return false;
 			}
 		}
 
 		if (!CanTrade(order.Security ?? Security, order.Portfolio ?? Portfolio, order.Side, order.Volume, out var reason))
 		{
 			ProcessOrderFail(order, new InvalidOperationException(reason));
-			return;
+			return false;
 		}
 
 		OrderProcessor.TryAttach(order);
 		OnOrderRegistering(order);
-#pragma warning disable CS0618 // strategy ordering still drives the sync facade; async migration is follow-up work
-		SubmitNewOrder(order, () => _connector.RegisterOrder(order));
-#pragma warning restore CS0618
+		return true;
 	}
 
 	/// <summary>
@@ -843,10 +867,34 @@ public partial class Strategy : BaseLogReceiver, IStrategyHost, IPositionProvide
 	/// </summary>
 	public void CancelOrder(Order order)
 	{
+		if (!TryPrepareCancel(order))
+			return;
+
+		CancelOrderHandler(order);
+	}
+
+	/// <summary>
+	/// Async version of <see cref="CancelOrder"/>: completes when the cancel request
+	/// has been handed to the connector pipeline.
+	/// </summary>
+	/// <param name="order">The order which should be canceled.</param>
+	/// <param name="cancellationToken"><see cref="CancellationToken"/>.</param>
+	/// <returns><see cref="ValueTask"/>.</returns>
+	public ValueTask CancelOrderAsync(Order order, CancellationToken cancellationToken = default)
+	{
+		if (!TryPrepareCancel(order))
+			return default;
+
+		OrderCanceling?.Invoke(order);
+		return _connector.CancelOrderAsync(order, cancellationToken);
+	}
+
+	private bool TryPrepareCancel(Order order)
+	{
 		if (ProcessState != ProcessStates.Started)
 		{
 			LogWarning(LocalizedStrings.StrategyInStateCannotCancelOrder, ProcessState);
-			return;
+			return false;
 		}
 
 		if (order is null)
@@ -855,7 +903,7 @@ public partial class Strategy : BaseLogReceiver, IStrategyHost, IPositionProvide
 		if (TradingMode == StrategyTradingModes.Disabled)
 		{
 			LogWarning(LocalizedStrings.TradingDisabled);
-			return;
+			return false;
 		}
 
 		if (!OrderProcessor.IsTracked(order))
@@ -864,10 +912,10 @@ public partial class Strategy : BaseLogReceiver, IStrategyHost, IPositionProvide
 		if (!OrderProcessor.TryMarkCanceled(order))
 		{
 			LogWarning(LocalizedStrings.OrderAlreadySentCancel, order.TransactionId);
-			return;
+			return false;
 		}
 
-		CancelOrderHandler(order);
+		return true;
 	}
 
 	/// <summary>
@@ -891,6 +939,32 @@ public partial class Strategy : BaseLogReceiver, IStrategyHost, IPositionProvide
 	/// <param name="changes">Order changes.</param>
 	public void EditOrder(Order order, Order changes)
 	{
+		if (!TryPrepareEdit(order, changes))
+			return;
+
+#pragma warning disable CS0618 // sync entry point retained; use EditOrderAsync to avoid blocking
+		_connector.EditOrder(order, changes);
+#pragma warning restore CS0618
+	}
+
+	/// <summary>
+	/// Async version of <see cref="EditOrder"/>: completes when the edit request
+	/// has been handed to the connector pipeline.
+	/// </summary>
+	/// <param name="order">Original order.</param>
+	/// <param name="changes">Order changes.</param>
+	/// <param name="cancellationToken"><see cref="CancellationToken"/>.</param>
+	/// <returns><see cref="ValueTask"/>.</returns>
+	public ValueTask EditOrderAsync(Order order, Order changes, CancellationToken cancellationToken = default)
+	{
+		if (!TryPrepareEdit(order, changes))
+			return default;
+
+		return _connector.EditOrderAsync(order, changes, cancellationToken);
+	}
+
+	private bool TryPrepareEdit(Order order, Order changes)
+	{
 		if (order is null)
 			throw new ArgumentNullException(nameof(order));
 
@@ -900,19 +974,17 @@ public partial class Strategy : BaseLogReceiver, IStrategyHost, IPositionProvide
 		if (!CanTrade(order.Security ?? Security, order.Portfolio ?? Portfolio, order.Side, changes.Volume, out var reason))
 		{
 			ProcessOrderFail(order, new InvalidOperationException(reason));
-			return;
+			return false;
 		}
 
 		if (RiskManager.Rules.Count > 0)
 		{
 			// A risk rule fired: skip the edit, mirroring the monolith which only edits when no action.
 			if (ProcessRisk(changes.CreateRegisterMessage()) is not null)
-				return;
+				return false;
 		}
 
-#pragma warning disable CS0618 // strategy ordering still drives the sync facade; async migration is follow-up work
-		_connector.EditOrder(order, changes);
-#pragma warning restore CS0618
+		return true;
 	}
 
 	/// <summary>
@@ -921,6 +993,32 @@ public partial class Strategy : BaseLogReceiver, IStrategyHost, IPositionProvide
 	/// <param name="oldOrder">Order to cancel.</param>
 	/// <param name="newOrder">New order to register.</param>
 	public void ReRegisterOrder(Order oldOrder, Order newOrder)
+	{
+		if (!TryPrepareReRegister(oldOrder, newOrder))
+			return;
+
+#pragma warning disable CS0618 // sync entry point retained; use ReRegisterOrderAsync to avoid blocking
+		SubmitNewOrder(newOrder, () => _connector.ReRegisterOrder(oldOrder, newOrder));
+#pragma warning restore CS0618
+	}
+
+	/// <summary>
+	/// Async version of <see cref="ReRegisterOrder"/>: completes when the request
+	/// has been handed to the connector pipeline.
+	/// </summary>
+	/// <param name="oldOrder">Order to cancel.</param>
+	/// <param name="newOrder">New order to register.</param>
+	/// <param name="cancellationToken"><see cref="CancellationToken"/>.</param>
+	/// <returns><see cref="ValueTask"/>.</returns>
+	public ValueTask ReRegisterOrderAsync(Order oldOrder, Order newOrder, CancellationToken cancellationToken = default)
+	{
+		if (!TryPrepareReRegister(oldOrder, newOrder))
+			return default;
+
+		return SubmitNewOrderAsync(newOrder, () => _connector.ReRegisterOrderAsync(oldOrder, newOrder, cancellationToken));
+	}
+
+	private bool TryPrepareReRegister(Order oldOrder, Order newOrder)
 	{
 		if (oldOrder is null)
 			throw new ArgumentNullException(nameof(oldOrder));
@@ -931,7 +1029,7 @@ public partial class Strategy : BaseLogReceiver, IStrategyHost, IPositionProvide
 		if (!CanTrade(newOrder.Security ?? Security, newOrder.Portfolio ?? Portfolio, newOrder.Side, newOrder.Volume, out var reason))
 		{
 			ProcessOrderFail(newOrder, new InvalidOperationException(reason));
-			return;
+			return false;
 		}
 
 		PrepareNewOrder(newOrder);
@@ -944,15 +1042,13 @@ public partial class Strategy : BaseLogReceiver, IStrategyHost, IPositionProvide
 			{
 				// A risk rule fired: veto the new order, it must not reach the connector.
 				ProcessOrderFail(newOrder, new InvalidOperationException(action.Value.GetFieldDisplayName()));
-				return;
+				return false;
 			}
 		}
 
 		OrderProcessor.TryAttach(newOrder);
 		OnOrderReRegistering(oldOrder, newOrder);
-#pragma warning disable CS0618 // strategy ordering still drives the sync facade; async migration is follow-up work
-		SubmitNewOrder(newOrder, () => _connector.ReRegisterOrder(oldOrder, newOrder));
-#pragma warning restore CS0618
+		return true;
 	}
 
 	/// <summary>
@@ -1905,6 +2001,26 @@ public partial class Strategy : BaseLogReceiver, IStrategyHost, IPositionProvide
 		try
 		{
 			submit();
+		}
+		finally
+		{
+			_pendingOwnOrders.Remove(order);
+
+			if (order.TransactionId != 0)
+				_ownTransactionIds.Add(order.TransactionId);
+		}
+	}
+
+	private async ValueTask SubmitNewOrderAsync(Order order, Func<ValueTask> submit)
+	{
+		if (submit is null)
+			throw new ArgumentNullException(nameof(submit));
+
+		_pendingOwnOrders.Add(order);
+
+		try
+		{
+			await submit();
 		}
 		finally
 		{

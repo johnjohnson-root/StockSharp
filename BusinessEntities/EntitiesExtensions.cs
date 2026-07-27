@@ -120,13 +120,17 @@ public static partial class EntitiesExtensions
 		if (provider.IsOrderReplaceable(order) == true)
 		{
 			if (provider.IsOrderEditable(order) == true)
+#pragma warning disable CS0618 // rule/event-driven sync context; async migration blocked on the sync event model
 				provider.EditOrder(order, clone);
+#pragma warning restore CS0618
 			else
 				provider.ReRegisterOrder(order, clone);
 		}
 		else
 		{
+#pragma warning disable CS0618 // rule/event-driven sync context; async migration blocked on the sync event model
 			provider.CancelOrder(order);
+#pragma warning restore CS0618
 			provider.RegisterOrder(clone);
 		}
 	}
@@ -182,7 +186,9 @@ public static partial class EntitiesExtensions
 			throw new ArgumentNullException(nameof(provider));
 
 		var newOrder = oldOrder.ReRegisterClone(price, volume);
+#pragma warning disable CS0618 // rule/event-driven sync context; async migration blocked on the sync event model
 		provider.ReRegisterOrder(oldOrder, newOrder);
+#pragma warning restore CS0618
 		return newOrder;
 	}
 

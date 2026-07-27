@@ -1,4 +1,4 @@
-namespace StockSharp.Algo.PositionManagement;
+﻿namespace StockSharp.Algo.PositionManagement;
 
 /// <summary>
 /// Standalone manager that drives position to a target value using configurable algorithms.
@@ -112,7 +112,9 @@ public class PositionTargetManager : BaseLogReceiver
 					existing.Canceled = true;
 
 					if (existing.ActiveOrder is not null && !existing.ActiveOrder.State.IsFinal())
+#pragma warning disable CS0618 // rule/event-driven sync context; async migration blocked on the sync event model
 						_transProvider.CancelOrder(existing.ActiveOrder);
+#pragma warning restore CS0618
 
 					existing.ActiveAlgo.Cancel();
 					existing.ActiveAlgo.Dispose();
@@ -150,7 +152,9 @@ public class PositionTargetManager : BaseLogReceiver
 				state.Canceled = true;
 
 				if (state.ActiveOrder is not null && !state.ActiveOrder.State.IsFinal())
+#pragma warning disable CS0618 // rule/event-driven sync context; async migration blocked on the sync event model
 					_transProvider.CancelOrder(state.ActiveOrder);
+#pragma warning restore CS0618
 
 				state.ActiveAlgo?.Cancel();
 				state.ActiveAlgo?.Dispose();
@@ -270,7 +274,9 @@ public class PositionTargetManager : BaseLogReceiver
 
 				state.ActiveOrder = order;
 				SetupOrderRules(order, security, portfolio, state);
+#pragma warning disable CS0618 // rule/event-driven sync context; async migration blocked on the sync event model
 				_transProvider.RegisterOrder(order);
+#pragma warning restore CS0618
 				OrderRegistered?.Invoke(order);
 				break;
 			}
@@ -278,7 +284,9 @@ public class PositionTargetManager : BaseLogReceiver
 			case PositionModifyAction.ActionTypes.Cancel:
 			{
 				if (state.ActiveOrder is not null && !state.ActiveOrder.State.IsFinal())
+#pragma warning disable CS0618 // rule/event-driven sync context; async migration blocked on the sync event model
 					_transProvider.CancelOrder(state.ActiveOrder);
+#pragma warning restore CS0618
 				break;
 			}
 

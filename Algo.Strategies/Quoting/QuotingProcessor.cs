@@ -156,7 +156,9 @@ public class QuotingProcessor : BaseLogReceiver
 	{
 		if (_currentOrder != null && !_currentOrder.State.IsFinal())
 		{
+#pragma warning disable CS0618 // rule/event-driven sync context; async migration blocked on the sync event model
 			_transProvider.CancelOrder(_currentOrder);
+#pragma warning restore CS0618
 		}
 
 		RaiseFinished(false);
@@ -292,7 +294,9 @@ public class QuotingProcessor : BaseLogReceiver
 		_pending = true;
 
 		SetupOrderRules(order);
+#pragma warning disable CS0618 // rule/event-driven sync context; async migration blocked on the sync event model
 		_transProvider.RegisterOrder(order);
+#pragma warning restore CS0618
 
 		LogInfo($"Registering order: {action.Reason}");
 	}
@@ -306,7 +310,9 @@ public class QuotingProcessor : BaseLogReceiver
 		}
 
 		_pending = true;
+#pragma warning disable CS0618 // rule/event-driven sync context; async migration blocked on the sync event model
 		_transProvider.CancelOrder(_currentOrder);
+#pragma warning restore CS0618
 		LogInfo($"Cancelling order: {reason}");
 	}
 
