@@ -1,4 +1,4 @@
-namespace StockSharp.MatchingEngine;
+﻿namespace StockSharp.MatchingEngine;
 
 using System.Threading.Tasks;
 
@@ -1355,5 +1355,5 @@ public class MatchingEngineAdapter : IMessageTransport
 	/// Send out message.
 	/// </summary>
 	public ValueTask SendOutMessageAsync(Message message, CancellationToken cancellationToken)
-		=> NewOutMessageAsync?.Invoke(message, cancellationToken) ?? default;
+		=> NewOutMessageAsync.InvokeAllAsync(message, cancellationToken);
 }

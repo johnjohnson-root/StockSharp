@@ -1,4 +1,4 @@
-namespace StockSharp.Messages;
+﻿namespace StockSharp.Messages;
 
 using System.Runtime.CompilerServices;
 
@@ -626,7 +626,7 @@ public abstract partial class MessageAdapter : BaseLogReceiver, IMessageAdapter,
 		if (message is DataTypeInfoMessage dtim && dtim.FileDataType is DataType dt && dt.IsMarketData)
 			this.AddSupportedMarketDataType(dt);
 
-		return _newOutMessageAsync?.Invoke(message, cancellationToken) ?? default;
+		return _newOutMessageAsync.InvokeAllAsync(message, cancellationToken);
 	}
 
 	/// <summary>

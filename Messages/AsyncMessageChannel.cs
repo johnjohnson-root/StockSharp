@@ -1,4 +1,4 @@
-namespace StockSharp.Messages;
+﻿namespace StockSharp.Messages;
 
 using Nito.AsyncEx;
 
@@ -185,7 +185,7 @@ public class AsyncMessageChannel(IMessageAdapter adapter) : Disposable, IMessage
 
 	private ValueTask RaiseNewOutMessage(Message message, CancellationToken cancellationToken)
 	{
-		return NewOutMessageAsync?.Invoke(message, cancellationToken) ?? default;
+		return NewOutMessageAsync.InvokeAllAsync(message, cancellationToken);
 	}
 
 	private Task ProcessMessagesAsync(CancellationToken token)
@@ -355,23 +355,19 @@ public class AsyncMessageChannel(IMessageAdapter adapter) : Disposable, IMessage
 
 				try
 				{
-					var vt = _();
+					// a ValueTask may be consumed exactly once: convert to Task
+					// immediately - the old AsTask+await+IsFaulted+AsTask sequence
+					// reads recycled state when the source is pooled
+					var task = _().AsTask();
 
-					if (!vt.IsCompleted)
-					{
-						if (!item.IsControl)
-							_childTasks.Add(item, vt.AsTask());
+					if (!task.IsCompleted && !item.IsControl)
+						_childTasks.Add(item, task);
 
-						await vt;
+					// await propagates faults and cancellation directly
+					await task;
 
-						if (!item.IsControl)
-							_childTasks.Remove(item);
-					}
-
-					if (vt.IsFaulted)
-						throw vt.AsTask().Exception;
-					else if (vt.IsCanceled)
-						throw new OperationCanceledException();
+					if (!item.IsControl)
+						_childTasks.Remove(item);
 
 					if (msg.Type != MessageTypes.Time)
 						_adapter.AddVerboseLog("endprocess: {0}", msg.Type);

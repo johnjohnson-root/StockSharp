@@ -1,4 +1,4 @@
-namespace StockSharp.Algo.Testing.Emulation;
+﻿namespace StockSharp.Algo.Testing.Emulation;
 
 using StockSharp.Algo.Commissions;
 using StockSharp.MatchingEngine;
@@ -794,7 +794,7 @@ public class MarketEmulator : BaseLogReceiver, IMarketEmulator
 	/// Send out message.
 	/// </summary>
 	public ValueTask SendOutMessageAsync(Message message, CancellationToken cancellationToken)
-		=> NewOutMessageAsync?.Invoke(message, cancellationToken) ?? default;
+		=> NewOutMessageAsync.InvokeAllAsync(message, cancellationToken);
 }
 
 /// <summary>

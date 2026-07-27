@@ -1,4 +1,4 @@
-namespace StockSharp.Messages;
+﻿namespace StockSharp.Messages;
 
 /// <summary>
 /// Message channel base interface.
@@ -88,7 +88,7 @@ public class PassThroughMessageChannel : Cloneable<IMessageChannel>, IMessageCha
 
 	ValueTask IMessageTransport.SendInMessageAsync(Message message, CancellationToken cancellationToken)
 	{
-		return _newOutMessageAsync?.Invoke(message, cancellationToken) ?? default;
+		return _newOutMessageAsync.InvokeAllAsync(message, cancellationToken);
 	}
 
 	private Func<Message, CancellationToken, ValueTask> _newOutMessageAsync;

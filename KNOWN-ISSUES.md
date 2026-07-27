@@ -11,6 +11,21 @@ surfaces 1–3 different failures — observed so far:
 the failed tests once; a test that fails twice fails the job. All tests stay
 active — nothing in the tail is skipped.
 
+## Fixed here: async event fan-out discarded all but the last handler's task
+
+Every pipeline event is a `Func<Message, CancellationToken, ValueTask>` and
+was raised as `handler?.Invoke(...)`. Invoking a multicast delegate returns
+only the **last** handler's `ValueTask`, so with two or more subscribers
+(e.g. `Connector` plus every `Strategy`) all other handlers ran unobserved:
+exceptions swallowed, back-pressure lost, and a subscriber could be handed
+message N+1 while its handler for message N was still running. All ten raise
+sites now go through `AsyncEventExtensions.InvokeAllAsync`, which awaits every
+handler sequentially in subscription order (single-subscriber path unchanged
+and allocation-free). Related fix in the same area: `AsyncMessageChannel`
+consumed one `ValueTask` four times (`AsTask`/`await`/`IsFaulted`/`AsTask`) —
+undefined behaviour for pooled sources; it now converts to `Task` exactly
+once. Both defects still exist upstream.
+
 ## Fixed here: disconnect could drop queued unsubscribes
 
 `Connection_SubscriptionsCleanedOnDisconnect` occasionally saw the adapter

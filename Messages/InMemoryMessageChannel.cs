@@ -1,4 +1,4 @@
-namespace StockSharp.Messages;
+﻿namespace StockSharp.Messages;
 
 /// <summary>
 /// Message channel, based on the queue and operate within a single process.
@@ -127,7 +127,7 @@ public class InMemoryMessageChannel : Disposable, IMessageChannel
 
 				try
 				{
-					await (NewOutMessageAsync?.Invoke(message, cancellationToken) ?? default);
+					await NewOutMessageAsync.InvokeAllAsync(message, cancellationToken);
 				}
 				catch (Exception ex)
 				{

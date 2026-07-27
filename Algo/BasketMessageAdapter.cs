@@ -1,4 +1,4 @@
-namespace StockSharp.Algo;
+﻿namespace StockSharp.Algo;
 
 using StockSharp.Algo.Basket;
 using StockSharp.Algo.Candles;
@@ -954,7 +954,7 @@ public class BasketMessageAdapter : BaseLogReceiver, IMessageAdapterWrapper
 	protected virtual ValueTask OnSendOutMessageAsync(Message message, CancellationToken cancellationToken)
 	{
 		message.Adapter ??= this;
-		return NewOutMessageAsync?.Invoke(message, cancellationToken) ?? default;
+		return NewOutMessageAsync.InvokeAllAsync(message, cancellationToken);
 	}
 
 	private void SecurityAdapterProviderOnChanged((SecurityId, DataType) key, Guid adapterId, bool isAdd)
