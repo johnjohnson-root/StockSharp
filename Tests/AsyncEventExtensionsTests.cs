@@ -125,7 +125,7 @@ public class AsyncEventExtensionsTests : BaseTestClass
 	[Timeout(15000, CooperativeCancellation = true)]
 	public async Task Channel_WaitsAllSubscribers_PerMessage()
 	{
-		using var channel = new InMemoryMessageChannel(new MessageByOrderQueue(), "TestChannel", _ => { });
+		using IMessageChannel channel = new InMemoryMessageChannel(new MessageByOrderQueue(), "TestChannel", _ => { });
 
 		var gate = AsyncHelper.CreateTaskCompletionSource<bool>();
 		var sub1Entered = 0;
