@@ -1,0 +1,11 @@
+# Disables CodeRabbit automated reviews for this repository.
+# CodeRabbit reads this file from the head branch of each pull request.
+# Note: this only silences the bot; uninstalling the GitHub App itself
+# requires a repo/org admin (GitHub Settings -> GitHub Apps -> CodeRabbit,
+# or the coderabbit.ai dashboard).
+reviews:
+  auto_review:
+    enabled: false
+  review_status: false
+chat:
+  auto_reply: false
