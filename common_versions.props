@@ -29,6 +29,7 @@
   <PropertyGroup>
     <EcngVer>1.0.*</EcngVer>
     <StockSharpVer>5.*</StockSharpVer>
+    <NitoAsyncExVer>5.1.2</NitoAsyncExVer>
 
     <MathNumVer>6.0.0-beta2</MathNumVer>
     <HtmlAgilityPackVer>1.11.45</HtmlAgilityPackVer>

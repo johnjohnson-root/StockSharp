@@ -9,5 +9,8 @@
   <ItemGroup>
     <PackageReference Include="Ecng.Logging" Version="$(EcngVer)" />
     <PackageReference Include="Ecng.Linq" Version="$(EcngVer)" />
+    <!-- AsyncMessageChannel uses Nito.AsyncEx directly; declare it rather than
+         relying on it arriving transitively through Ecng. -->
+    <PackageReference Include="Nito.AsyncEx.Coordination" Version="$(NitoAsyncExVer)" />
   </ItemGroup>
 </Project>
