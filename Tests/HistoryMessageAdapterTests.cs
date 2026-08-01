@@ -11,6 +11,27 @@ public class HistoryMessageAdapterTests : BaseTestClass
 {
 	private static SecurityId CreateSecurityId() => Helper.CreateSecurityId();
 
+	// Poll for an expected out-message instead of a fixed delay: the replay runs
+	// on a background task, and under a loaded (parallel) suite any fixed sleep
+	// is eventually too short.
+	private static async Task<T> WaitForMessageAsync<T>(ConcurrentQueue<Message> messages, Func<T, bool> predicate, CancellationToken cancellationToken)
+		where T : Message
+	{
+		T result = null;
+
+		for (var i = 0; i < 100; i++)
+		{
+			result = messages.OfType<T>().FirstOrDefault(predicate);
+
+			if (result != null)
+				break;
+
+			await Task.Delay(50, cancellationToken);
+		}
+
+		return result;
+	}
+
 	private class TestSecurityProvider : ISecurityProvider
 	{
 		private readonly List<Security> _securities = [];
@@ -597,12 +618,9 @@ public class HistoryMessageAdapterTests : BaseTestClass
 
 		await adapter.SendInMessageAsync(stateMsg, CancellationToken);
 
-		// Give time for background task to process
-		await Task.Delay(100, CancellationToken);
-
 		// Should have EmulationStateMessage with Stopping state
-		var stoppingState = outMessages.OfType<EmulationStateMessage>()
-			.SingleOrDefault(m => m.State == ChannelStates.Stopping && m.Error != null);
+		var stoppingState = await WaitForMessageAsync<EmulationStateMessage>(
+			outMessages, m => m.State == ChannelStates.Stopping && m.Error != null, CancellationToken);
 
 		stoppingState.AssertNotNull();
 		// The stopping state must carry the actual failure cause, not a generic cancellation.
@@ -639,18 +657,19 @@ public class HistoryMessageAdapterTests : BaseTestClass
 
 		await adapter.SendInMessageAsync(stateMsg, CancellationToken);
 
-		// Give time for background task to start
-		await Task.Delay(50, CancellationToken);
+		// Wait for the background replay task to actually start (fixed sleeps race
+		// against a loaded test host).
+		for (var i = 0; i < 100 && !manager.IsStarted; i++)
+			await Task.Delay(50, CancellationToken);
+
+		manager.IsStarted.AssertTrue("replay task did not start");
 
 		// Stop the adapter
 		await adapter.SendInMessageAsync(new EmulationStateMessage { State = ChannelStates.Stopping }, CancellationToken);
 
-		// Give time for cancellation to propagate
-		await Task.Delay(100, CancellationToken);
-
 		// Should have EmulationStateMessage with Stopping state
-		var stoppingState = outMessages.OfType<EmulationStateMessage>()
-			.FirstOrDefault(m => m.State == ChannelStates.Stopping);
+		var stoppingState = await WaitForMessageAsync<EmulationStateMessage>(
+			outMessages, m => m.State == ChannelStates.Stopping, CancellationToken);
 
 		stoppingState.AssertNotNull();
 	}
@@ -689,12 +708,9 @@ public class HistoryMessageAdapterTests : BaseTestClass
 
 		await adapter.SendInMessageAsync(stateMsg, CancellationToken);
 
-		// Give time for background task to process
-		await Task.Delay(100, CancellationToken);
-
 		// Should have received the tick message
-		var receivedTick = outMessages.OfType<ExecutionMessage>()
-			.FirstOrDefault(m => m.DataTypeEx == DataType.Ticks);
+		var receivedTick = await WaitForMessageAsync<ExecutionMessage>(
+			outMessages, m => m.DataTypeEx == DataType.Ticks, CancellationToken);
 
 		receivedTick.AssertNotNull();
 		receivedTick.TradePrice.AssertEqual(100m);
@@ -738,12 +754,9 @@ public class HistoryMessageAdapterTests : BaseTestClass
 
 		await adapter.SendInMessageAsync(stateMsg, CancellationToken);
 
-		// Give time for background task to process
-		await Task.Delay(100, CancellationToken);
-
 		// Should have received generator-produced tick
-		var receivedTick = outMessages.OfType<ExecutionMessage>()
-			.FirstOrDefault(m => m.DataTypeEx == DataType.Ticks);
+		var receivedTick = await WaitForMessageAsync<ExecutionMessage>(
+			outMessages, m => m.DataTypeEx == DataType.Ticks, CancellationToken);
 
 		receivedTick.AssertNotNull();
 		receivedTick.TradePrice.AssertEqual(150m);
