@@ -34,6 +34,17 @@ surfaces 1–3 different failures — observed so far:
 the failed tests once; a test that fails twice fails the job. All tests stay
 active — nothing in the tail is skipped.
 
+One member of the tail is now identified rather than merely observed:
+`OptimizerPauseTests.PauseHaltsBruteForce` has twice been named by the
+`--blame-hang` sequence file as the only test still in flight when the run
+aborted, on windows both times, and in a distinctive way — every test reports
+`Passed` first (`Failed: 0, Passed: 4388`) and the test host then sits idle
+until the 8-minute inactivity timer kills it. So the hang is after the test's
+assertions complete: the optimizer's pause/resume machinery leaves something
+running that keeps the process alive. The per-test retry cannot rescue this
+class of failure, because the abort is attributed to the run, not the test —
+a rerun of the job is currently the only recovery.
+
 ## Fixed here: async event fan-out discarded all but the last handler's task
 
 Every pipeline event is a `Func<Message, CancellationToken, ValueTask>` and

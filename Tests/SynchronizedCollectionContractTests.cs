@@ -174,11 +174,14 @@ public class SynchronizedCollectionContractTests : BaseTestClass
 	{
 		var set = new CachedSynchronizedSet<string>();
 
-		set.Add("a").AssertTrue();
-		set.Add("a").AssertFalse();
+		// Add is void here (ICollection<T>.Add), so the set semantics are observed
+		// through the resulting state rather than a return value
+		set.Add("a");
+		set.Add("a");
 
 		set.Count.AssertEqual(1);
 		set.Cache.Length.AssertEqual(1);
+		set.Contains("a").AssertTrue();
 	}
 
 	[TestMethod]
@@ -255,9 +258,12 @@ public class SynchronizedCollectionContractTests : BaseTestClass
 	{
 		var set = new SynchronizedSet<string> { "a" };
 
-		set.Add("a").AssertFalse();
-		set.Add("b").AssertTrue();
+		set.Add("a");
+		set.Add("b");
+
 		set.Count.AssertEqual(2);
+		set.Contains("a").AssertTrue();
+		set.Contains("b").AssertTrue();
 	}
 
 	[TestMethod]
