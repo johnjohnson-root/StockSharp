@@ -21,6 +21,26 @@ dotnet test StockSharp_Tests.slnx
 
 Requires the .NET 10 SDK. Both solutions reference only projects inside this repository — no private sibling repos, no private NuGet feeds, no folder-name requirements. Not included in the solutions: the WPF-only `Media` project, the `Samples` (they reference StockSharp NuGet binaries), and all proprietary connectors/GUI products described below, which were never part of this repository.
 
+### Dependency pinning and mirroring ###
+
+External package versions are pinned in `Directory.Build.targets` to the newest
+releases published before the license change, and `NuGet.config` declares a
+deterministic source list. Because several pinned packages (`Ecng.*`,
+`StockSharp.Samples.HistoryData`) are published by the upstream owner, the
+repository also supports a local mirror feed that survives any unpublish:
+run `./tools/mirror-packages.sh` to capture the full package closure into
+`nuget-mirror/` (see `nuget-mirror/README.md`), or run the `Mirror packages`
+GitHub workflow to produce it as a CI artifact.
+
+### Fork packages ###
+
+`./tools/pack.sh` (or the `Pack` GitHub workflow) builds NuGet packages for
+every library in `StockSharp.slnx` under fork-branded ids — `SSharp.*` by
+default, configurable via `-p:ForkPackagePrefix=...` (see
+`common_packaging.props`). Assembly names and namespaces remain `StockSharp.*`,
+so switching a consumer from upstream packages to these is only a
+`PackageReference` id change. Publishing to a feed is a deliberate manual step.
+
 ## Introduction ##
 
 **StockSharp** (**S#** for short) – is a **free** platform for trading on any market in the world (crypto exchanges, American, European, Asian, Russian, stocks, futures, options, Bitcoins, forex, etc.). You will be able to trade manually or automatically (algorithmic trading robots, conventional or HFT).

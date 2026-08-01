@@ -1,0 +1,38 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <!--
+    Fork-branded NuGet packaging (imported for every project via common_meta.props).
+
+    Package IDs are distinct from upstream's so downstream projects can depend on
+    this Apache-2.0 fork instead of upstream's post-2026-07-16 (EULA) packages,
+    and so pushes never collide with upstream's reserved "StockSharp.*" prefix on
+    nuget.org. Assembly names, namespaces and file layout are UNCHANGED
+    (StockSharp.*), so the packages are drop-in: only the PackageReference id in
+    consuming projects differs.
+
+    The default prefix "SSharp" (after the platform's own "S#" short name) is a
+    deliberate placeholder decision - rebrand any time with:
+
+      dotnet pack StockSharp.slnx -c Release -p:ForkPackagePrefix=YourBrand
+
+    Versioning: ForkPackageVersion tracks the assembly version (5.0.0, the last
+    Apache-2.0 upstream state) and is bumped per fork release, independently of
+    upstream's package feeds.
+  -->
+  <PropertyGroup>
+    <ForkPackagePrefix Condition="'$(ForkPackagePrefix)' == ''">SSharp</ForkPackagePrefix>
+    <ForkPackageVersion Condition="'$(ForkPackageVersion)' == ''">5.0.0</ForkPackageVersion>
+    <ForkRepositoryUrl Condition="'$(ForkRepositoryUrl)' == ''">https://github.com/johnjohnson-root/StockSharp</ForkRepositoryUrl>
+
+    <PackageId>$(ForkPackagePrefix).$(MSBuildProjectName)</PackageId>
+    <PackageVersion>$(ForkPackageVersion)</PackageVersion>
+
+    <Authors>StockSharp community fork contributors</Authors>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <PackageProjectUrl>$(ForkRepositoryUrl)</PackageProjectUrl>
+    <RepositoryUrl>$(ForkRepositoryUrl)</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>stocksharp;fork;apache-2.0;trading;algotrading;backtesting</PackageTags>
+    <Description Condition="'$(Description)' == ''">$(SSProjectName) — from the Apache-2.0 community fork of the StockSharp trading platform. Assembly and namespaces are unchanged ($(SSProjectName)); only the package id is fork-branded.</Description>
+  </PropertyGroup>
+</Project>
