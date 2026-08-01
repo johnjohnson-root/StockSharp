@@ -29,8 +29,11 @@ jobs:
         run: ./tools/mirror-packages.sh
 
       - name: Verify offline restore from mirror
+        # --no-http-cache is defence in depth: a folder feed does not consult
+        # NuGet's HTTP cache today, but the flag keeps the "offline" claim honest
+        # if a remote source ever sneaks back into this restore.
         run: |
-          dotnet restore StockSharp_Tests.slnx --source ./nuget-mirror --packages "$RUNNER_TEMP/verify-pkgs"
+          dotnet restore StockSharp_Tests.slnx --source ./nuget-mirror --no-http-cache --packages "$RUNNER_TEMP/verify-pkgs"
 
       - name: Upload mirror artifact
         uses: actions/upload-artifact@v4

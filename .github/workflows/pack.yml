@@ -30,9 +30,13 @@ jobs:
             10.0.x
 
       - name: Pack
+        # The input goes through env rather than template interpolation so a
+        # crafted "version" value cannot inject shell syntax into the script.
+        env:
+          FORK_PACKAGE_VERSION: ${{ github.event.inputs.version }}
         run: |
-          if [ -n "${{ github.event.inputs.version }}" ]; then
-            export PACK_ARGS="-p:ForkPackageVersion=${{ github.event.inputs.version }}"
+          if [ -n "$FORK_PACKAGE_VERSION" ]; then
+            export PACK_ARGS="-p:ForkPackageVersion=$FORK_PACKAGE_VERSION"
           fi
           ./tools/pack.sh
 
