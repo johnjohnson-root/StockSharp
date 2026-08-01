@@ -34,16 +34,42 @@ surfaces 1–3 different failures — observed so far:
 the failed tests once; a test that fails twice fails the job. All tests stay
 active — nothing in the tail is skipped.
 
-One member of the tail is now identified rather than merely observed:
-`OptimizerPauseTests.PauseHaltsBruteForce` has twice been named by the
+One member of the tail was identified and is now fixed here:
+`OptimizerPauseTests.PauseHaltsBruteForce` was twice named by the
 `--blame-hang` sequence file as the only test still in flight when the run
 aborted, on windows both times, and in a distinctive way — every test reports
 `Passed` first (`Failed: 0, Passed: 4388`) and the test host then sits idle
-until the 8-minute inactivity timer kills it. So the hang is after the test's
-assertions complete: the optimizer's pause/resume machinery leaves something
-running that keeps the process alive. The per-test retry cannot rescue this
-class of failure, because the abort is attributed to the run, not the test —
-a rerun of the job is currently the only recovery.
+until the 8-minute inactivity timer kills it. So the hang was after the test's
+assertions complete: the optimizer's pause/resume machinery left work running
+that kept the process alive. Auditing that machinery found four defects, all
+fixed here (the windows repro is statistical, so the fix is asserted from the
+defects, not from a reproduced hang):
+
+- `HistoryMessageAdapter`'s suspend gate was a `ManualResetEventSlim` — every
+  suspended backtest **blocked a thread-pool thread** in a synchronous
+  `Wait`. An optimizer pause parks a full batch (default `CPU*2`) of replay
+  loops at once, which on small CI runners starves the pool the test host
+  itself needs. The gate is now an async `AsyncManualResetEvent` and the
+  replay loop awaits it.
+- `BaseOptimizer` never disposed the `HistoryEmulationConnector` it created
+  per iteration, so each one's emulation graph (replay task, gates, adapter
+  chain) was left to leak. The worker that starts an iteration now owns its
+  teardown: the connector is disposed in a `finally`, on success, error and
+  cancellation paths alike.
+- The per-iteration completion await (`await tcs.Task`) took no cancellation
+  token, and the cancel sweep's state filter can miss a connector that had
+  not started when the token fired — a worker (or a genetic-optimizer fitness
+  evaluation) could park forever. The await now honours the caller's token,
+  and the sweep tolerates connectors concurrently torn down by their workers.
+- Each iteration's `CopyPortfolioProvider` subscribed to the run-lifetime
+  portfolio provider's events and never unsubscribed (unbounded handler-list
+  growth over a long optimization); it is now disposed with its iteration.
+
+Additionally, `[AssemblyCleanup]` now arms a 3-minute background watchdog: if
+the test host is still alive that long after cleanup, it prints a diagnostic
+and exits with code 97 — converting any recurrence of this failure class from
+an 8-minute silent abort blamed on the last test into a fast, attributed
+failure.
 
 ## Fixed here: async event fan-out discarded all but the last handler's task
 

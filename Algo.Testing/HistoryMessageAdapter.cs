@@ -2,6 +2,8 @@ namespace StockSharp.Algo.Testing;
 
 using System.Runtime.CompilerServices;
 
+using Nito.AsyncEx;
+
 using StockSharp.Algo.Testing.Generation;
 
 /// <summary>
@@ -15,7 +17,10 @@ public class HistoryMessageAdapter : MessageAdapter, IEmulationMessageAdapter
 
 	// Gate that pauses the historical replay loop while the emulation is suspended.
 	// Open by default; closed on Suspending and reopened on Starting (resume).
-	private readonly ManualResetEventSlim _processingGate = new(true);
+	// Async (not ManualResetEventSlim): a suspended replay must not pin a thread-pool
+	// thread in a synchronous wait — with a batch of parallel backtests suspended
+	// (optimizer pause) those blocked threads can starve the pool on small CI runners.
+	private readonly AsyncManualResetEvent _processingGate = new(true);
 
 	/// <summary>
 	/// The provider of information about instruments.
@@ -353,9 +358,9 @@ public class HistoryMessageAdapter : MessageAdapter, IEmulationMessageAdapter
 			{
 				await foreach (var message in _marketDataManager.StartAsync(boards).WithCancellation(token))
 				{
-					// Block here while the emulation is suspended; the replay is lazy, so not pulling
+					// Wait here while the emulation is suspended; the replay is lazy, so not pulling
 					// the next message also halts data generation - no backlog builds up.
-					_processingGate.Wait(token);
+					await _processingGate.WaitAsync(token);
 
 					await SendOutMessageAsync(message, token);
 				}
@@ -389,7 +394,6 @@ public class HistoryMessageAdapter : MessageAdapter, IEmulationMessageAdapter
 	protected override void DisposeManaged()
 	{
 		StopProcessing();
-		_processingGate.Dispose();
 		base.DisposeManaged();
 	}
 
