@@ -1,0 +1,6 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="..\common_target_net.props" />
+  <PropertyGroup>
+    <RootNamespace>StockSharp.Foundation</RootNamespace>
+  </PropertyGroup>
+</Project>

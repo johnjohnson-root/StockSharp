@@ -15,6 +15,7 @@
   <Project Path="Configuration/Configuration.csproj" />
   <Project Path="Diagram.Core/Diagram.Core.csproj" />
   <Project Path="Localization.Generator/Localization.Generator.csproj" />
+  <Project Path="Foundation/Foundation.csproj" />
   <Project Path="Localization/Localization.csproj" />
   <Project Path="Media.Generator/Media.Generator.csproj" />
   <Project Path="Media.Names/Media.Names.csproj" />
