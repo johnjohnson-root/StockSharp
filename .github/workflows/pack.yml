@@ -1,0 +1,44 @@
+name: Pack
+
+# Builds the fork-branded NuGet packages (SSharp.* by default, see
+# common_packaging.props) and uploads them as a CI artifact. Publishing to a
+# feed stays a deliberate, manual step: download the artifact and push with
+# `dotnet nuget push`.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Package version (ForkPackageVersion)
+        required: false
+        default: ""
+
+jobs:
+  pack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            6.0.x
+            10.0.x
+
+      - name: Pack
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            export PACK_ARGS="-p:ForkPackageVersion=${{ github.event.inputs.version }}"
+          fi
+          ./tools/pack.sh
+
+      - name: Upload packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: nupkgs
+          path: artifacts/nupkgs/*.nupkg
+          if-no-files-found: error

@@ -1,6 +1,12 @@
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <SSProjectName>StockSharp.$(MSBuildProjectName)</SSProjectName>
+  </PropertyGroup>
+
+  <!-- Fork-branded NuGet packaging (PackageId, license, repo metadata). -->
+  <Import Project="$(MSBuildThisFileDirectory)common_packaging.props" />
+
+  <PropertyGroup>
 
     <RootNamespace>$(SSProjectName)</RootNamespace>
     <AssemblyName>$(SSProjectName)</AssemblyName>

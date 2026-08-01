@@ -16,7 +16,7 @@ public abstract class BaseOptimizer : BaseLogReceiver
 		public void Free(MarketDataStorageCache cache) { }
 	}
 
-	private class CopyPortfolioProvider : IPortfolioProvider
+	private class CopyPortfolioProvider : IPortfolioProvider, IDisposable
 	{
 		private readonly IPortfolioProvider _provider;
 		private readonly SynchronizedDictionary<string, Portfolio> _copies = new(StringComparer.InvariantCultureIgnoreCase);
@@ -27,6 +27,14 @@ public abstract class BaseOptimizer : BaseLogReceiver
 
 			_provider.NewPortfolio += OnNewPortfolio;
 			_provider.PortfolioChanged += OnPortfolioChanged;
+		}
+
+		// Per-iteration instance over a run-lifetime provider: unhook, or every
+		// iteration permanently grows the shared provider's handler lists.
+		public void Dispose()
+		{
+			_provider.NewPortfolio -= OnNewPortfolio;
+			_provider.PortfolioChanged -= OnPortfolioChanged;
 		}
 
 		private void OnNewPortfolio(Portfolio portfolio)
@@ -290,6 +298,7 @@ public abstract class BaseOptimizer : BaseLogReceiver
 			SingleReader = true,
 		});
 
+		_linkedCts?.Dispose();
 		_linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
 		_linkedCts.Token.Register(() =>
@@ -304,12 +313,21 @@ public abstract class BaseOptimizer : BaseLogReceiver
 			{
 				foreach (var connector in _startedConnectors)
 				{
-					if (connector.State is
-						ChannelStates.Started or
-						ChannelStates.Starting or
-						ChannelStates.Suspended or
-						ChannelStates.Suspending)
-						connector.Disconnect();
+					try
+					{
+						if (connector.State is
+							ChannelStates.Started or
+							ChannelStates.Starting or
+							ChannelStates.Suspended or
+							ChannelStates.Suspending)
+							connector.Disconnect();
+					}
+					catch (Exception ex)
+					{
+						// A connector being torn down concurrently by its worker must not
+						// break the sweep for the remaining connectors (or the Cancel call).
+						this.AddErrorLog(ex);
+					}
 				}
 			}
 		});
@@ -331,7 +349,16 @@ public abstract class BaseOptimizer : BaseLogReceiver
 	protected override void DisposeManaged()
 	{
 		UnblockPauseWaiters();
-		_linkedCts?.Cancel();
+
+		if (_linkedCts is { } linkedCts)
+		{
+			// Cancel runs the registration synchronously (disconnects still-running
+			// connectors); dispose afterwards so the source itself is not leaked.
+			linkedCts.Cancel();
+			linkedCts.Dispose();
+			_linkedCts = null;
+		}
+
 		base.DisposeManaged();
 	}
 
@@ -369,6 +396,7 @@ public abstract class BaseOptimizer : BaseLogReceiver
 		Strategy strategy;
 		IStrategyParam[] parameters;
 		HistoryEmulationConnector connector;
+		CopyPortfolioProvider pfProvider = null;
 		Guid iterationId;
 
 		using (_sync.EnterScope())
@@ -387,11 +415,13 @@ public abstract class BaseOptimizer : BaseLogReceiver
 			}
 
 			// Try to get next strategy
-			var pfProvider = new CopyPortfolioProvider(PortfolioProvider);
+			pfProvider = new CopyPortfolioProvider(PortfolioProvider);
 			var next = tryGetNext(pfProvider);
 
 			if (next is null)
 			{
+				pfProvider.Dispose();
+
 				_allIterationsStarted = true;
 				CheckFinished();
 				return false;
@@ -401,7 +431,10 @@ public abstract class BaseOptimizer : BaseLogReceiver
 
 			// Reserve slot in batch
 			if (!_batchManager.TryReserveSlot(out iterationId))
+			{
+				pfProvider.Dispose();
 				return false;
+			}
 
 			strategy.Parent ??= this;
 
@@ -411,8 +444,30 @@ public abstract class BaseOptimizer : BaseLogReceiver
 
 		var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 		SetupIteration(connector, strategy, parameters, iterationId, tcs);
-		await StartIterationAsync(connector, strategy, parameters, cancellationToken);
-		return await tcs.Task;
+
+		try
+		{
+			await StartIterationAsync(connector, strategy, parameters, cancellationToken);
+
+			// Honour cancellation while parked on the iteration: the completion tcs is set
+			// from the connector's Stopped transition, and the cancel sweep in
+			// InitializeRunAsync can miss a connector that had not started when the token
+			// fired - without the token this await could park the worker forever.
+			return await tcs.Task.WaitAsync(cancellationToken);
+		}
+		finally
+		{
+			// The worker owns its iteration's teardown. Disposing the connector releases
+			// the whole emulation graph (replay task, suspend gate, adapters) even on the
+			// paths where nobody else stops it - the fix for the post-run test-host hang
+			// tracked in KNOWN-ISSUES.md. On the success path the iteration has already
+			// completed, so this is only object cleanup.
+			using (_sync.EnterScope())
+				_startedConnectors.Remove(connector);
+
+			pfProvider.Dispose();
+			connector.Dispose();
+		}
 	}
 
 	private void CheckFinished()

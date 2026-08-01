@@ -202,3 +202,9 @@ CLAUDE.md
 AGENTS.md
 /reviewResults
 nul
+# Local NuGet mirror payload (folder + README are committed, binaries are not;
+# see nuget-mirror/README.md and tools/mirror-packages.sh)
+nuget-mirror/*.nupkg
+
+# Packed fork packages (tools/pack.sh output)
+artifacts/

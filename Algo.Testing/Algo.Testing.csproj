@@ -1,4 +1,9 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <!-- HistoryMessageAdapter uses Nito.AsyncEx directly (async suspend gate);
+         declare it rather than relying on it arriving transitively. -->
+    <PackageReference Include="Nito.AsyncEx.Coordination" Version="$(NitoAsyncExVer)" />
+  </ItemGroup>
   <Import Project="..\common_target_net.props" />
   <ItemGroup>
     <ProjectReference Include="..\Algo\Algo.csproj" />
