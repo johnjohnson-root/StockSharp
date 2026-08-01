@@ -720,4 +720,97 @@ public class OptimizerTests : BaseTestClass
 
 		IsTrue(count < strategies.Count, $"Should have been cancelled by timeout before all {strategies.Count} iterations, got {count}");
 	}
+
+	/// <summary>
+	/// Tests that a single failing iteration costs only that iteration: the worker
+	/// survives and the failed iteration's batch slot is released, so all remaining
+	/// iterations still run. Regression test for the stale-reservation defect where
+	/// a startup failure leaked the slot and the worker treated the batch as
+	/// exhausted, silently abandoning the rest of the run.
+	/// </summary>
+	[TestMethod]
+	public async Task BruteForceRunAsyncSurvivesIterationStartFailure()
+	{
+		var security = CreateTestSecurity();
+		var portfolio = CreateTestPortfolio();
+
+		var secProvider = new CollectionSecurityProvider([security]);
+		var pfProvider = new CollectionPortfolioProvider([portfolio]);
+		var storageRegistry = GetHistoryStorage();
+
+		using var optimizer = new BruteForceOptimizer(secProvider, pfProvider, storageRegistry);
+
+		// Single worker makes the regression sharp: with a leaked slot (or a dead
+		// worker) nothing after the poisoned iteration would run at all.
+		optimizer.EmulationSettings.BatchSize = 1;
+
+		var startTime = Paths.HistoryBeginDate;
+		var stopTime = Paths.HistoryBeginDate.AddDays(6);
+
+		var strategies = CreateStrategyIterations(security, portfolio, 20, 30, 10, 60, 80, 20).ToList();
+		IsTrue(strategies.Count >= 3, "Need at least 3 iterations so the failure sits mid-run");
+
+		// Poison a middle iteration so surviving both the failure and the slot loss
+		// is observable on both sides of it.
+		var poisoned = strategies[1].strategy;
+
+		optimizer.StrategyInitialized += (strategy, parameters) =>
+		{
+			if (ReferenceEquals(strategy, poisoned))
+				throw new InvalidOperationException("Poisoned iteration.");
+		};
+
+		var results = new List<Strategy>();
+
+		await foreach (var (strategy, _) in optimizer.RunAsync(startTime, stopTime, strategies, CancellationToken))
+		{
+			results.Add(strategy);
+		}
+
+		AreEqual(strategies.Count - 1, results.Count,
+			$"All {strategies.Count - 1} healthy iterations must complete despite one startup failure, got {results.Count}");
+		IsFalse(results.Contains(poisoned), "The failed iteration must not be reported as a result");
+	}
+
+	/// <summary>
+	/// Tests that a token already cancelled before the run starts terminates the
+	/// enumeration promptly with no completed iterations and no hang. Regression
+	/// guard for reserved slots being released on the cancellation path.
+	/// </summary>
+	[TestMethod]
+	public async Task BruteForceRunAsyncCancelledBeforeStart()
+	{
+		var security = CreateTestSecurity();
+		var portfolio = CreateTestPortfolio();
+
+		var secProvider = new CollectionSecurityProvider([security]);
+		var pfProvider = new CollectionPortfolioProvider([portfolio]);
+		var storageRegistry = GetHistoryStorage();
+
+		using var optimizer = new BruteForceOptimizer(secProvider, pfProvider, storageRegistry);
+
+		var startTime = Paths.HistoryBeginDate;
+		var stopTime = Paths.HistoryBeginDate.AddDays(6);
+
+		var strategies = CreateStrategyIterations(security, portfolio, 20, 30, 10, 60, 80, 20).ToList();
+
+		using var cts = CancellationTokenSource.CreateLinkedTokenSource(CancellationToken);
+		cts.Cancel();
+
+		var count = 0;
+
+		try
+		{
+			await foreach (var _ in optimizer.RunAsync(startTime, stopTime, strategies, cts.Token))
+			{
+				count++;
+			}
+		}
+		catch (OperationCanceledException)
+		{
+			// expected
+		}
+
+		AreEqual(0, count, "No iterations should complete when cancelled before start");
+	}
 }

@@ -443,7 +443,9 @@ public abstract class BaseOptimizer : BaseLogReceiver
 		}
 
 		var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-		SetupIteration(connector, strategy, parameters, iterationId, tcs);
+		var completionGate = new IterationCompletionGate();
+
+		SetupIteration(connector, strategy, parameters, iterationId, tcs, completionGate);
 
 		try
 		{
@@ -467,6 +469,26 @@ public abstract class BaseOptimizer : BaseLogReceiver
 
 			pfProvider.Dispose();
 			connector.Dispose();
+
+			if (completionGate.TryEnter())
+			{
+				// The iteration never completed naturally (StartIterationAsync failed, or
+				// cancellation hit while the connector had not reached Stopped and the
+				// cancel sweep could not see it). Return the reserved slot so the batch
+				// keeps full capacity - a stale reservation makes surviving workers treat
+				// the batch as exhausted and silently abandon remaining iterations - and
+				// keep the cancel-drain completion contract intact.
+				bool isFinished;
+
+				using (_sync.EnterScope())
+				{
+					_batchManager.CompleteIteration(iterationId);
+					isFinished = _allIterationsStarted && _batchManager.IsFinished;
+				}
+
+				if (isFinished || (_cancelEmulation && _batchManager.RunningCount == 0))
+					CompleteChannel();
+			}
 		}
 	}
 
@@ -508,12 +530,24 @@ public abstract class BaseOptimizer : BaseLogReceiver
 		return connector;
 	}
 
+	// Single-entry latch shared by an iteration's two possible finalizers: the
+	// connector's Stopped transition (natural completion) and the worker's unwind
+	// in TryNextRunAsync (startup failure or cancellation). CompleteIteration
+	// throws on a duplicate id, so exactly one of them may release the slot.
+	private sealed class IterationCompletionGate
+	{
+		private int _entered;
+
+		public bool TryEnter() => Interlocked.Exchange(ref _entered, 1) == 0;
+	}
+
 	private void SetupIteration(
 		HistoryEmulationConnector connector,
 		Strategy strategy,
 		IStrategyParam[] parameters,
 		Guid iterationId,
-		TaskCompletionSource<bool> tcs)
+		TaskCompletionSource<bool> tcs,
+		IterationCompletionGate completionGate)
 	{
 		var lastStep = 0;
 
@@ -522,6 +556,13 @@ public abstract class BaseOptimizer : BaseLogReceiver
 		connector.StateChanged2 += state =>
 		{
 			if (state != ChannelStates.Stopped)
+				return;
+
+			// Loses only against the worker's unwind in TryNextRunAsync (which then
+			// owns the slot release) or a duplicate Stopped transition; completing
+			// here after either would double-release the slot and report a result
+			// for a torn-down iteration.
+			if (!completionGate.TryEnter())
 				return;
 
 			OnIterationCompleted(connector, strategy, parameters, iterationId, lastStep, tcs);

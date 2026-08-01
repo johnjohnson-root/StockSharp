@@ -99,10 +99,32 @@ public class BruteForceOptimizer : BaseOptimizer
 
 			workers[i] = Task.Run(async () =>
 			{
+				// One poisoned iteration (strategy init/start failure) must cost that
+				// iteration, not the worker and all its remaining iterations: the slot is
+				// returned by TryNextRunAsync's teardown, so the loop can carry on at full
+				// batch capacity. The consecutive-failure cap bounds a tryGetNext that
+				// throws before anything is reserved, which would otherwise spin forever.
+				const int maxConsecutiveFailures = 100;
+				var consecutiveFailures = 0;
+
 				try
 				{
-					while (await TryNextRunAsync(startTime, stopTime, tryGetNext, adapterCache, storageCache, cancellationToken))
+					while (true)
 					{
+						try
+						{
+							if (!await TryNextRunAsync(startTime, stopTime, tryGetNext, adapterCache, storageCache, cancellationToken))
+								break;
+
+							consecutiveFailures = 0;
+						}
+						catch (Exception ex) when (ex is not OperationCanceledException)
+						{
+							this.AddErrorLog(ex);
+
+							if (++consecutiveFailures >= maxConsecutiveFailures)
+								throw;
+						}
 					}
 				}
 				finally
