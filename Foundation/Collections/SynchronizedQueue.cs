@@ -4,7 +4,7 @@ namespace StockSharp.Foundation.Collections;
 /// Thread-safe FIFO queue.
 /// </summary>
 /// <typeparam name="T">Item type.</typeparam>
-public class SynchronizedQueue<T> : IEnumerable<T>
+public class SynchronizedQueue<T> : IEnumerable<T>, ISynchronized
 {
 	private readonly Queue<T> _inner = [];
 

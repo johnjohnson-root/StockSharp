@@ -9,7 +9,7 @@ namespace StockSharp.Foundation.Collections;
 /// to know whether the item was new. Enumeration hands back a snapshot.
 /// </remarks>
 /// <typeparam name="T">Item type.</typeparam>
-public class SynchronizedSet<T> : ICollection<T>
+public class SynchronizedSet<T> : ICollection<T>, ISynchronized
 {
 	private readonly HashSet<T> _inner;
 

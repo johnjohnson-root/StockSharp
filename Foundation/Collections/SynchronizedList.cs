@@ -8,7 +8,7 @@ namespace StockSharp.Foundation.Collections;
 /// caller can enumerate while another thread mutates.
 /// </remarks>
 /// <typeparam name="T">Item type.</typeparam>
-public class SynchronizedList<T> : IList<T>
+public class SynchronizedList<T> : IList<T>, ISynchronized
 {
 	private readonly List<T> _inner;
 

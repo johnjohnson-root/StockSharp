@@ -12,7 +12,7 @@ namespace StockSharp.Foundation.Collections;
 /// </remarks>
 /// <typeparam name="TKey">Key type.</typeparam>
 /// <typeparam name="TValue">Value type.</typeparam>
-public class SynchronizedDictionary<TKey, TValue> : IDictionary<TKey, TValue>
+public class SynchronizedDictionary<TKey, TValue> : IDictionary<TKey, TValue>, ISynchronized
 {
 	private readonly Dictionary<TKey, TValue> _inner;
 
