@@ -1,5 +1,6 @@
 namespace StockSharp.Tests;
 
+using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 
 using StockSharp.Algo.Testing;
@@ -401,14 +402,14 @@ public class HistoryMessageAdapterTests : BaseTestClass
 	{
 		var secProvider = CreateSecurityProvider();
 		var manager = new TestHistoryMarketDataManager { IsStarted = false };
-		var outMessages = new List<Message>();
+		var outMessages = new ConcurrentQueue<Message>();
 
 		using var adapter = new HistoryMessageAdapter(
 			new IncrementalIdGenerator(),
 			secProvider,
 			manager);
 
-		adapter.NewOutMessageAsync += (m, ct) => { outMessages.Add(m); return default; };
+		adapter.NewOutMessageAsync += (m, ct) => { outMessages.Enqueue(m); return default; };
 
 		await adapter.SendInMessageAsync(new ConnectMessage(), CancellationToken);
 
@@ -580,14 +581,14 @@ public class HistoryMessageAdapterTests : BaseTestClass
 			ExceptionToThrow = new InvalidOperationException("Test error")
 		};
 
-		var outMessages = new List<Message>();
+		var outMessages = new ConcurrentQueue<Message>();
 
 		using var adapter = new HistoryMessageAdapter(
 			new IncrementalIdGenerator(),
 			secProvider,
 			manager);
 
-		adapter.NewOutMessageAsync += (m, ct) => { outMessages.Add(m); return default; };
+		adapter.NewOutMessageAsync += (m, ct) => { outMessages.Enqueue(m); return default; };
 
 		var stateMsg = new EmulationStateMessage
 		{
@@ -622,14 +623,14 @@ public class HistoryMessageAdapterTests : BaseTestClass
 			ShouldWaitForCancellation = true
 		};
 
-		var outMessages = new List<Message>();
+		var outMessages = new ConcurrentQueue<Message>();
 
 		using var adapter = new HistoryMessageAdapter(
 			new IncrementalIdGenerator(),
 			secProvider,
 			manager);
 
-		adapter.NewOutMessageAsync += (m, ct) => { outMessages.Add(m); return default; };
+		adapter.NewOutMessageAsync += (m, ct) => { outMessages.Enqueue(m); return default; };
 
 		var stateMsg = new EmulationStateMessage
 		{
@@ -672,14 +673,14 @@ public class HistoryMessageAdapterTests : BaseTestClass
 
 		manager.MessagesToYield.Add(tickMessage);
 
-		var outMessages = new List<Message>();
+		var outMessages = new ConcurrentQueue<Message>();
 
 		using var adapter = new HistoryMessageAdapter(
 			new IncrementalIdGenerator(),
 			secProvider,
 			manager);
 
-		adapter.NewOutMessageAsync += (m, ct) => { outMessages.Add(m); return default; };
+		adapter.NewOutMessageAsync += (m, ct) => { outMessages.Enqueue(m); return default; };
 
 		var stateMsg = new EmulationStateMessage
 		{
@@ -721,14 +722,14 @@ public class HistoryMessageAdapterTests : BaseTestClass
 		};
 		manager.MessagesToYield.Add(generatedTick);
 
-		var outMessages = new List<Message>();
+		var outMessages = new ConcurrentQueue<Message>();
 
 		using var adapter = new HistoryMessageAdapter(
 			new IncrementalIdGenerator(),
 			secProvider,
 			manager);
 
-		adapter.NewOutMessageAsync += (m, ct) => { outMessages.Add(m); return default; };
+		adapter.NewOutMessageAsync += (m, ct) => { outMessages.Enqueue(m); return default; };
 
 		var stateMsg = new EmulationStateMessage
 		{
@@ -802,14 +803,14 @@ public class HistoryMessageAdapterTests : BaseTestClass
 		manager.MessagesToYield.Add(tickMessage);
 		manager.MessagesToYield.Add(level1Message);
 
-		var outMessages = new List<Message>();
+		var outMessages = new ConcurrentQueue<Message>();
 
 		using var adapter = new HistoryMessageAdapter(
 			new IncrementalIdGenerator(),
 			secProvider,
 			manager);
 
-		adapter.NewOutMessageAsync += (m, ct) => { outMessages.Add(m); return default; };
+		adapter.NewOutMessageAsync += (m, ct) => { outMessages.Enqueue(m); return default; };
 
 		await adapter.SendInMessageAsync(new EmulationStateMessage { State = ChannelStates.Starting }, CancellationToken);
 
