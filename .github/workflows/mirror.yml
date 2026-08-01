@@ -1,0 +1,40 @@
+name: Mirror packages
+
+# Produces a self-contained NuGet folder feed with the exact package closure
+# both solutions build against (see tools/mirror-packages.sh and NuGet.config).
+# Run it manually and stash the artifact somewhere durable; it is the recovery
+# path if any pinned upstream package (Ecng.*, HistoryData, ...) is ever
+# unpublished or delisted.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            6.0.x
+            10.0.x
+
+      - name: Build mirror
+        run: ./tools/mirror-packages.sh
+
+      - name: Verify offline restore from mirror
+        run: |
+          dotnet restore StockSharp_Tests.slnx --source ./nuget-mirror --packages "$RUNNER_TEMP/verify-pkgs"
+
+      - name: Upload mirror artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nuget-mirror
+          path: nuget-mirror/*.nupkg
+          if-no-files-found: error
