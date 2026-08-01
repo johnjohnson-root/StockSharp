@@ -14,6 +14,12 @@ public class SynchronizedQueue<T> : IEnumerable<T>
 	public Lock SyncRoot { get; } = new();
 
 	/// <summary>
+	/// Take <see cref="SyncRoot"/> for the duration of the returned scope.
+	/// </summary>
+	/// <returns>Lock scope.</returns>
+	public Lock.Scope EnterScope() => SyncRoot.EnterScope();
+
+	/// <summary>
 	/// Item count.
 	/// </summary>
 	public int Count

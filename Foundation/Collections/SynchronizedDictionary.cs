@@ -47,6 +47,12 @@ public class SynchronizedDictionary<TKey, TValue> : IDictionary<TKey, TValue>
 	protected Dictionary<TKey, TValue> Inner => _inner;
 
 	/// <summary>
+	/// Take <see cref="SyncRoot"/> for the duration of the returned scope.
+	/// </summary>
+	/// <returns>Lock scope.</returns>
+	public Lock.Scope EnterScope() => SyncRoot.EnterScope();
+
+	/// <summary>
 	/// Called after any mutation, while <see cref="SyncRoot"/> is held.
 	/// </summary>
 	protected virtual void OnChanged()

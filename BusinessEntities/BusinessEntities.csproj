@@ -8,6 +8,7 @@
     <PackageReference Include="Ecng.Drawing" Version="$(EcngVer)" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\Foundation\Foundation.csproj" />
     <ProjectReference Include="..\Messages\Messages.csproj" />
   </ItemGroup>
 </Project>

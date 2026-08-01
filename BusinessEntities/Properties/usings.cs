@@ -11,7 +11,7 @@ global using System.Threading.Tasks;
 
 global using Ecng.Common;
 global using Ecng.ComponentModel;
-global using Ecng.Collections;
+global using StockSharp.Foundation.Collections;
 global using Ecng.Serialization;
 global using Ecng.Logging;
 
