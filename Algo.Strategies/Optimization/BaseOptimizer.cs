@@ -507,6 +507,19 @@ public abstract class BaseOptimizer : BaseLogReceiver
 		}
 	}
 
+	// Completes the channel on IsFinished alone, where the two iteration finalizers
+	// require _allIterationsStarted as well. The weaker test is safe on its own:
+	// IsFinished is (_startedCount >= _totalIterations && _running.Count == 0), the
+	// started count only grows, so the first half makes CanStartNext false for the
+	// rest of the run and the second half says nothing is in flight. Nothing further
+	// can reach the channel, whatever _allIterationsStarted holds.
+	//
+	// The conjunction elsewhere is the conservative form, not a stronger guarantee:
+	// it delays completion until some worker observes exhaustion. Neither predicate
+	// is the primary terminator. A source that runs dry before _totalIterations
+	// leaves IsFinished false forever - BruteForceOptimizer passes int.MaxValue
+	// whenever MaxIterations is unset - and those runs end when every worker has left
+	// its loop and the driver task completes the channel.
 	private void CheckFinished()
 	{
 		if (_batchManager.IsFinished)
