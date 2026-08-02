@@ -32,14 +32,38 @@ stay until callers migrate.
 ## Flaky-test tail (CI retries failed tests once)
 
 Beyond the deterministic fixes below,
-the suite carries a long tail of low-probability timing-sensitive tests:
-each 3-OS run (~13k test executions) surfaces 1–3 different failures,
-drawn so far from `CandleTests.TotalPrice` ("Sequence contains more than one element"),
-`Subscriptions_RepeatedRounds_AllProcessed` (windows, ~1 min),
-and `Connection_SubscriptionsCleanedOnDisconnect`.
-CI therefore retries exactly the failed tests once,
+the suite carried a long tail of low-probability timing-sensitive tests:
+each 3-OS run (~13k test executions) surfaced 1–3 different failures,
+drawn from three tests.
+Each one now has an identified cause and a test-only fix,
+so the tail list is empty:
+
+- `CandleTests.TotalPrice` ("Sequence contains more than one element")
+  built its ticks from a raw `DateTime.UtcNow` at +0s, +1s and +1min
+  and asserted the first two share one 1-minute candle.
+  A base time in the final second of a minute put the +1s tick
+  in the next candle,
+  so `Process` returned two candles and `Single()` threw —
+  one second in sixty, about 1.7% of runs.
+  The base time is anchored to the start of the minute.
+- `Subscriptions_RepeatedRounds_AllProcessed` (windows, ~1 min)
+  and `Connection_SubscriptionsCleanedOnDisconnect` (macos, 15 s)
+  both gated on a *count* of `SubscriptionOnline` events
+  rather than on the transaction ids they had just created.
+  A late event crossing a round boundary, or the connector's own
+  order-status subscription reaching Online,
+  stood in for a subscription still subscribing;
+  the gate opened early, `UnSubscribeAll` skipped that subscription
+  because it cleans active ones alone,
+  and the following wait ran to the test timeout.
+  Both gates now wait for their own ids.
+  Reasoned from the test sources rather than reproduced.
+
+CI still retries exactly the failed tests once,
 and a test that fails twice fails the job.
-All tests stay active, the tail included.
+The retry mechanism comes out once five consecutive runs record no retry,
+which is the evidence that the tail is closed rather than quiet.
+All tests stay active.
 
 One member of the tail is now fixed here.
 The `--blame-hang` sequence file twice named

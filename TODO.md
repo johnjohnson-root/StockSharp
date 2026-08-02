@@ -245,33 +245,30 @@ into a comment) or align both to the conjunction.
 Verify: reasoning recorded at `CheckFinished`;
 optimizer suites green; standard gate green.
 
-### T12. Burn down the flaky tail
+### T12. Flaky tail — causes found 2026-08-02, retry removal pending
 
-Blocked by: nothing. One test per pass; the playbook is proven.
+All three documented members now have a cause and a test-only fix,
+one commit each, and `KNOWN-ISSUES.md` carries the reasoning:
 
-The documented tail (`KNOWN-ISSUES.md`, "Flaky-test tail"):
-`CandleTests.TotalPrice` ("Sequence contains more than one element"),
-`Subscriptions_RepeatedRounds_AllProcessed` (windows, ~1 min),
-`Connection_SubscriptionsCleanedOnDisconnect` (15 s timeout, seen on
-macos 2026-08-02).
+- `CandleTests.TotalPrice` built its ticks from a raw `DateTime.UtcNow`,
+  so a base time in the final second of a minute split the first two
+  ticks across candles and `Single()` threw.
+  The base time is anchored to the minute. Deterministic, not reasoned.
+- `Subscriptions_RepeatedRounds_AllProcessed` and
+  `Connection_SubscriptionsCleanedOnDisconnect` both gated on a count
+  of `SubscriptionOnline` events instead of on their own transaction
+  ids, so a late cross-round event or the connector's own order-status
+  subscription opened the gate early;
+  `UnSubscribeAll` then skipped a subscription that had not reached
+  Online, and the next wait ran to the test timeout.
+  Both gates wait for their own ids now.
+  Reasoned from the test sources rather than reproduced,
+  which is the same standard the optimizer teardown fixes met.
 
-For each test, in its own commit:
-
-1. Reproduce or reason the race from the test source:
-   the two proven classes are unsynchronized collections mutated by a
-   background task (fix: `ConcurrentQueue`, commit `1793143`) and
-   fixed sleeps racing a loaded host (fix: bounded polling, commit
-   `83c6ca2`; `WaitForMessageAsync` in `Tests/HistoryMessageAdapterTests.cs`
-   is the template).
-2. Convert the timing assumption to a polled condition with a generous
-   bound; touch nothing but the test unless the product code is provably
-   at fault.
-3. Loop the test 8 times locally; all pass.
-4. Update the tail list in `KNOWN-ISSUES.md`.
-
-Done when the tail list is empty and CI's retry-once mechanism
-(`dotnet.yml`) records zero retries across five consecutive runs —
-then remove the retry mechanism in its own commit.
+What remains is evidence, not code:
+the retry-once mechanism in `dotnet.yml` comes out in its own commit
+once five consecutive CI runs record no retry.
+A new tail member appears as a new entry here and in `KNOWN-ISSUES.md`.
 
 ### T13. Audit the skips and the Python exclusion
 
