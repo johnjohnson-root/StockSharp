@@ -2,7 +2,8 @@
 
 ## Overview
 
-This section of the documentation explains how to manage orders in a .NET application using the StockSharp trading framework. The code facilitates operations like buying and selling securities by interacting with the trading service.
+This section of the documentation explains how to manage orders in a .NET application using the StockSharp trading framework.
+The code facilitates operations like buying and selling securities by interacting with the trading service.
 
 ## Key Components
 
@@ -21,7 +22,8 @@ This section of the documentation explains how to manage orders in a .NET applic
 
 ### Initialization and Connection Setup
 
-The constructor initializes the application and [loads existing settings](https://doc.stocksharp.com/en/topics/api/connectors/save_and_load_settings.html). The `Connect_Click` method sets up necessary bindings and event handlers for order operations:
+The constructor initializes the application and [loads existing settings](https://doc.stocksharp.com/en/topics/api/connectors/save_and_load_settings.html).
+The `Connect_Click` method sets up necessary bindings and event handlers for order operations:
 
 ```csharp
 public MainWindow()
@@ -48,7 +50,9 @@ private void Connect_Click(object sender, RoutedEventArgs e)
 
 ### Submitting Orders
 
-The application provides methods to submit buy and sell [orders](https://doc.stocksharp.com/en/topics/api/orders_management.html). These methods are triggered by UI events (e.g., button clicks) and use the selected security and portfolio details to create and register orders with the trading service:
+The application provides methods to submit buy and sell [orders](https://doc.stocksharp.com/en/topics/api/orders_management.html).
+These methods are triggered by UI events (e.g., button clicks)
+and use the selected security and portfolio details to create and register orders with the trading service:
 
 ```csharp
 private void Buy_Click(object sender, RoutedEventArgs e)
@@ -91,6 +95,9 @@ _connector.OrderRegisterFailed += OrderGrid.AddRegistrationFail;
 
 ## Conclusion
 
-This setup allows users to interactively manage trading orders [through a UI](https://doc.stocksharp.com/en/topics/api/graphical_user_interface/trading/orders.html), offering capabilities to buy and sell securities using configured trading services. This guide should help users understand the order handling process within the application and provide clear instructions on how to extend or modify this functionality.
+This setup allows users to interactively manage trading orders [through a UI](https://doc.stocksharp.com/en/topics/api/graphical_user_interface/trading/orders.html),
+offering capabilities to buy and sell securities using configured trading services.
+This guide should help users understand the order handling process within the application
+and provide clear instructions on how to extend or modify this functionality.
 
 Feel free to adjust the snippets and explanations to better fit the actual implementation details or specific configurations in your project.

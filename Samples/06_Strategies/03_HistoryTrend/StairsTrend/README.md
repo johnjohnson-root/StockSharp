@@ -2,7 +2,10 @@
 
 ## Overview
 
-This strategy operates by tracking consecutive bullish and bearish candle sequences. If a certain number (defined by `Length`) of consecutive bullish or bearish candles is observed, the strategy assumes the trend will continue in the same direction and takes a position accordingly. This is a trend-following approach that aims to capitalize on momentum in the market.
+This strategy operates by tracking consecutive bullish and bearish candle sequences.
+If a certain number (defined by `Length`) of consecutive bullish or bearish candles is observed,
+the strategy assumes the trend will continue in the same direction and takes a position accordingly.
+This is a trend-following approach that aims to capitalize on momentum in the market.
 
 ## Key Components
 
@@ -39,7 +42,8 @@ public StairsTrendStrategy()
 }
 ```
 
-- **Length Parameter**: Defines how many consecutive candles in one direction will trigger a signal (default is 3). This parameter can be optimized in a range from 2 to 10 with a step of 1.
+- **Length Parameter**: Defines how many consecutive candles in one direction will trigger a signal (default is 3).
+  This parameter can be optimized in a range from 2 to 10 with a step of 1.
 - **Candle Type Parameter**: Sets the timeframe for candles (default is 5-minute).
 - **Parameter Validation**: The Length parameter is validated to ensure it's greater than zero.
 
@@ -58,7 +62,8 @@ This helps platforms like Designer properly initialize the required market data.
 
 ### Strategy Initialization
 
-When the strategy starts, it initializes counters and sets up subscriptions:
+When the strategy starts,
+it initializes counters and sets up subscriptions:
 
 ```csharp
 protected override void OnStarted2(DateTime time)
@@ -92,7 +97,8 @@ protected override void OnStarted2(DateTime time)
 
 ### Candle Processing Logic
 
-This method is the core of the strategy, where the direction of each candle is assessed and trades are potentially triggered:
+This method is the core of the strategy,
+where the direction of each candle is assessed and trades are potentially triggered:
 
 ```csharp
 private void ProcessCandle(ICandleMessage candle)
@@ -148,13 +154,16 @@ private void ProcessCandle(ICandleMessage candle)
 The strategy's trend-following approach is based on the following principles:
 
 1. **Momentum Recognition**: The strategy identifies trend momentum by counting consecutive candles moving in the same direction.
-2. **Trend Continuation Assumption**: It assumes that after a certain number of movements in one direction, the trend is likely to continue in that direction.
-3. **Adaptive Sensitivity**: The `Length` parameter determines how many consecutive candles are required to confirm a trend, allowing adjustment based on market volatility and characteristics.
+2. **Trend Continuation Assumption**: It assumes that after a certain number of movements in one direction,
+   the trend is likely to continue in that direction.
+3. **Adaptive Sensitivity**: The `Length` parameter determines how many consecutive candles are required to confirm a trend,
+   allowing adjustment based on market volatility and characteristics.
 4. **Position Management**: The strategy can both enter new positions and add to existing ones when signals align with the current position.
 
 ## Conclusion
 
-The `StairsTrend` strategy is an implementation of a trend-following approach that seeks to profit from momentum in directional market moves. Its simplicity makes it accessible while the parameterization allows for customization to different market conditions and instruments.
+The `StairsTrend` strategy is an implementation of a trend-following approach that seeks to profit from momentum in directional market moves.
+Its simplicity makes it accessible while the parameterization allows for customization to different market conditions and instruments.
 
 Key advantages of this implementation include:
 - Clean integration with StockSharp's high-level APIs
@@ -163,4 +172,7 @@ Key advantages of this implementation include:
 - Proper state management
 - Simple yet effective pattern recognition
 
-This strategy can be particularly effective in trending markets where price movements tend to exhibit momentum. However, it may underperform in choppy or range-bound markets where false signals can lead to whipsaw losses. Consider combining it with additional trend confirmation indicators or using it within a broader market context analysis.
+This strategy can be particularly effective in trending markets where price movements tend to exhibit momentum.
+However, it may underperform in choppy or range-bound markets where false signals can lead to whipsaw losses.
+Consider combining it with additional trend confirmation indicators
+or using it within a broader market context analysis.

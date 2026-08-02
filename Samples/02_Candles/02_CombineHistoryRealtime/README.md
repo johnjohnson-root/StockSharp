@@ -2,7 +2,8 @@
 
 ## Overview
 
-This section of the documentation outlines how to manage and visualize both historical and real-time candle data within a .NET application using the StockSharp framework. The code integrates candle data management with charting to provide a continuous view of market changes.
+This section of the documentation outlines how to manage and visualize both historical and real-time candle data within a .NET application using the StockSharp framework.
+The code integrates candle data management with charting to provide a continuous view of market changes.
 
 ## Key Components
 
@@ -64,7 +65,9 @@ private void Connector_CandleSeriesProcessing(Subscription subscription, ICandle
 
 ### Selecting Security and Subscribing to Data
 
-When a security is selected, the application [subscribes](https://doc.stocksharp.com/en/topics/api/market_data/subscriptions.html) to both historical and real-time candle data, setting up the charting components accordingly:
+When a security is selected,
+the application [subscribes](https://doc.stocksharp.com/en/topics/api/market_data/subscriptions.html) to both historical and real-time candle data,
+setting up the charting components accordingly:
 
 ```csharp
 private void SecurityPicker_SecuritySelected(Security security)
@@ -93,6 +96,9 @@ private void SecurityPicker_SecuritySelected(Security security)
 
 ## Conclusion
 
-This approach allows the application to handle and visualize a comprehensive set of candle data, combining historical insights with the immediacy of real-time updates. This guide provides detailed instructions on how to implement and understand the functionalities for managing candle data in a trading environment.
+This approach allows the application to handle and visualize a comprehensive set of candle data,
+combining historical insights with the immediacy of real-time updates.
+This guide provides detailed instructions on how to implement and understand the functionalities for managing candle data in a trading environment.
 
-This documentation should assist users and developers in configuring and extending the application's capabilities to meet specific trading and data analysis needs. Adjustments can be made based on the actual implementation details or specific configurations in your project.
+This documentation should assist users and developers in configuring and extending the application's capabilities to meet specific trading and data analysis needs.
+Adjustments can be made based on the actual implementation details or specific configurations in your project.

@@ -2,7 +2,9 @@
 
 ## Overview
 
-This guide explains how to handle market data using the StockSharp trading framework in a .NET application. The application subscribes to market data updates for selected securities and displays this information in the UI.
+This guide explains how to handle market data using the StockSharp trading framework in a .NET application.
+The application subscribes to market data updates for selected securities
+and displays this information in the UI.
 
 ## Key Components
 
@@ -47,7 +49,8 @@ private void Connect_Click(object sender, RoutedEventArgs e)
 
 ### Handling Market Depth Data
 
-When the market depth data is received, the application updates the [UI component](https://doc.stocksharp.com/en/topics/api/graphical_user_interface/market_data/order_book.html) showing the market depth:
+When the market depth data is received,
+the application updates the [UI component](https://doc.stocksharp.com/en/topics/api/graphical_user_interface/market_data/order_book.html) showing the market depth:
 
 ```csharp
 private void ConnectorOnMarketDepthReceived(Subscription sub, IOrderBookMessage depth)
@@ -59,7 +62,8 @@ private void ConnectorOnMarketDepthReceived(Subscription sub, IOrderBookMessage 
 
 ### Handling Trade Data
 
-When trade data is received, it is added to a [grid](https://doc.stocksharp.com/en/topics/api/graphical_user_interface/market_data/ticks.html) that displays trades:
+When trade data is received,
+it is added to a [grid](https://doc.stocksharp.com/en/topics/api/graphical_user_interface/market_data/ticks.html) that displays trades:
 
 ```csharp
 private void ConnectorOnTickTradeReceived(Subscription sub, ITickTradeMessage trade)
@@ -71,7 +75,8 @@ private void ConnectorOnTickTradeReceived(Subscription sub, ITickTradeMessage tr
 
 ## Subscribing to Market Data
 
-When a security is selected, the application [subscribes](https://doc.stocksharp.com/en/topics/api/market_data/subscriptions.html) to level 1 data, trades, and market depth for that security:
+When a security is selected,
+the application [subscribes](https://doc.stocksharp.com/en/topics/api/market_data/subscriptions.html) to level 1 data, trades, and market depth for that security:
 
 ```csharp
 private void SecurityPicker_SecuritySelected(Security security)
@@ -110,4 +115,6 @@ private void UnsubscribeAll()
 
 ## Conclusion
 
-This setup enables the application to handle real-time market data effectively, providing insights into market dynamics and trade execution for selected securities. The code snippets provided illustrate how to integrate and manage market data within a trading application using the StockSharp framework.
+This setup enables the application to handle real-time market data effectively,
+providing insights into market dynamics and trade execution for selected securities.
+The code snippets provided illustrate how to integrate and manage market data within a trading application using the StockSharp framework.
