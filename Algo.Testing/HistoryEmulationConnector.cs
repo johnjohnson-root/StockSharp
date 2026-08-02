@@ -249,21 +249,37 @@ public class HistoryEmulationConnector : BaseEmulationConnector
 	private InMemoryMessageChannel InMemChannel
 		=> (Adapter.InnerAdapters.FirstOrDefault() as EmulationMessageAdapter)?.InChannel as InMemoryMessageChannel;
 
+	private int _maxMessageCount = -1;
+	private int _processedMessageCount;
+	private int _maxMessageCountReached;
+
 	/// <summary>
 	/// Maximum number of messages processed during backtesting. Negative value means the option is ignored.
 	/// </summary>
+	/// <remarks>
+	/// Reaching the limit stops the run the way exhausting the data does,
+	/// so <see cref="IsFinished"/> stays <see langword="true"/>
+	/// and everything produced up to that point is kept.
+	/// The emulation's own state messages are not counted.
+	/// </remarks>
 	public int MaxMessageCount
 	{
-		get => -1;
-		set
-		{
-			// TODO
+		get => _maxMessageCount;
+		set => _maxMessageCount = value;
+	}
 
-			//var channel = InMemChannel;
+	// Counts one processed message and reports whether this is the one that reached the
+	// limit. The exchange gate makes that true exactly once: messages already in flight
+	// when the limit trips must not re-enter the stop transition behind it.
+	private bool CountProcessedMessage()
+	{
+		var max = _maxMessageCount;
 
-			//if (channel is not null)
-			//	channel.MaxMessageCount = value;
-		}
+		if (max < 0)
+			return false;
+
+		return Interlocked.Increment(ref _processedMessageCount) >= max
+			&& Interlocked.Exchange(ref _maxMessageCountReached, 1) == 0;
 	}
 
 	/// <inheritdoc/>
@@ -341,6 +357,10 @@ public class HistoryEmulationConnector : BaseEmulationConnector
 		await base.ClearCacheAsync(cancellationToken);
 
 		IsFinished = false;
+
+		// The limit counts per run, so a reused connector starts each one from zero.
+		Interlocked.Exchange(ref _processedMessageCount, 0);
+		Interlocked.Exchange(ref _maxMessageCountReached, 0);
 	}
 
 	/// <inheritdoc />
@@ -348,6 +368,12 @@ public class HistoryEmulationConnector : BaseEmulationConnector
 	{
 		_startTime = HistoryMessageAdapter.StartDate;
 		_stopTime = HistoryMessageAdapter.StopDate;
+
+		// ClearCacheAsync is the caller's to invoke, so connect is the one point every
+		// run passes through; without this a reused connector would carry the previous
+		// run's count and trip the limit immediately.
+		Interlocked.Exchange(ref _processedMessageCount, 0);
+		Interlocked.Exchange(ref _maxMessageCountReached, 0);
 
 		_stepTicks = (_stopTime - _startTime).Ticks / 100;
 
@@ -440,6 +466,13 @@ public class HistoryEmulationConnector : BaseEmulationConnector
 				default:
 				{
 					await base.OnProcessMessage(message, cancellationToken);
+
+					if (CountProcessedMessage())
+					{
+						LogWarning("Processed {0} message(s), stopping: MaxMessageCount reached.", _processedMessageCount);
+						ProcessEmulationStateMessage(new() { State = ChannelStates.Stopping });
+					}
+
 					break;
 				}
 			}

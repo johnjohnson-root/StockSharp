@@ -104,6 +104,12 @@ so the section below stays `Unreleased` until a feed exists.
   for the next pass, bounded at 100,000 messages per key with a warning
   when it trims. A cycle that fails also waits its interval before
   retrying, where it previously spun at full speed.
+- `HistoryEmulationConnector.MaxMessageCount` bounds a backtest.
+  The property discarded whatever was assigned and its getter always returned
+  `-1`, so the limit never applied - including through `BaseOptimizer`, which
+  sets it on every backtest connector, and `OptimizerSettings`, which persists
+  it. Reaching the limit now stops the run the way exhausting the data does,
+  leaving `IsFinished` true and the results so far intact.
 - A suspended backtest no longer blocks a thread-pool thread.
   An optimizer pause parks a whole batch of replay loops at once, which
   starved the pool on small machines.

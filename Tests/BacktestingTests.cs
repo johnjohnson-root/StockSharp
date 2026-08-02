@@ -3087,4 +3087,85 @@ public class BacktestingTests : BaseTestClass
 		AreEqual(storageCandles, finishedCandlesReceived,
 			$"All stored candles must be delivered exactly once. Storage: {storageCandles}, Received: {finishedCandlesReceived}");
 	}
+
+	/// <summary>
+	/// Tests that <see cref="HistoryEmulationConnector.MaxMessageCount"/> bounds a run:
+	/// a capped backtest finishes having produced strictly less than an uncapped one
+	/// over the same window.
+	/// </summary>
+	/// <remarks>
+	/// Regression guard for the setting being a no-op. The property discarded its value
+	/// and its getter always returned -1, while BaseOptimizer set it on every backtest
+	/// connector it built and OptimizerSettings persisted it to disk.
+	/// </remarks>
+	[TestMethod]
+	[Timeout(120_000, CooperativeCancellation = true)]
+	public async Task MaxMessageCountBoundsTheRun()
+	{
+		if (Paths.HistoryDataPath == null)
+		{
+			// Not a silent pass: without market data both runs count zero and the
+			// comparison below would hold for the wrong reason.
+			Inconclusive("HistoryDataPath is null (stocksharp.samples.historydata not installed)");
+		}
+
+		var startTime = Paths.HistoryBeginDate;
+		var stopTime = Paths.HistoryBeginDate.AddDays(2);
+
+		async Task<int> RunAsync(int maxMessageCount)
+		{
+			var security = CreateTestSecurity();
+			var portfolio = CreateTestPortfolio();
+
+			using var connector = CreateConnector(
+				new CollectionSecurityProvider([security]),
+				new CollectionPortfolioProvider([portfolio]),
+				GetHistoryStorage(), startTime, stopTime);
+
+			connector.MaxMessageCount = maxMessageCount;
+
+			var candles = 0;
+			var done = AsyncHelper.CreateTaskCompletionSource<bool>();
+
+			connector.CandleReceived += (sub, candle) => Interlocked.Increment(ref candles);
+			connector.StateChanged2 += state =>
+			{
+				if (state == ChannelStates.Stopped)
+					done.TrySetResult(true);
+			};
+
+			connector.Subscribe(new Subscription(TimeSpan.FromMinutes(1).TimeFrame(), security));
+
+			connector.Connect();
+			await connector.StartAsync(CancellationToken);
+
+			var completed = await Task.WhenAny(done.Task, Task.Delay(TimeSpan.FromSeconds(45), CancellationToken));
+
+			if (completed != done.Task)
+			{
+				connector.Disconnect();
+				Fail($"Backtest with MaxMessageCount={maxMessageCount} did not finish");
+			}
+
+			return Volatile.Read(ref candles);
+		}
+
+		var uncapped = await RunAsync(-1);
+		IsTrue(uncapped > 0, "The uncapped run must produce candles for the comparison to mean anything");
+
+		var capped = await RunAsync(50);
+
+		// The behaviour is asserted before the property round-trip, so an implementation
+		// that stores the value without acting on it fails here rather than passing.
+		IsTrue(capped < uncapped,
+			$"MaxMessageCount must stop the run early: capped produced {capped} candles, uncapped {uncapped}");
+
+		using var probe = CreateConnector(
+			new CollectionSecurityProvider([CreateTestSecurity()]),
+			new CollectionPortfolioProvider([CreateTestPortfolio()]),
+			GetHistoryStorage(), startTime, stopTime);
+
+		probe.MaxMessageCount = 1234;
+		probe.MaxMessageCount.AssertEqual(1234, "MaxMessageCount must round-trip");
+	}
 }

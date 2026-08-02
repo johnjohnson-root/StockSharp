@@ -335,7 +335,41 @@ Against the unfixed adapter the test reports
 "storage saw 1 attempt(s)" and fails after 45 seconds,
 because no second attempt ever comes.
 
-## Open, found by reading: ten defects a survey turned up
+## Fixed here: MaxMessageCount was a setting that did nothing
+
+`HistoryEmulationConnector.MaxMessageCount` documented itself as
+"maximum number of messages processed during backtesting",
+and it was inert:
+the getter returned `-1` whatever was assigned,
+and the setter's body was commented out under a bare `// TODO`,
+pointing at an `InMemoryMessageChannel.MaxMessageCount` that does not exist —
+that channel exposes a read-only `MessageCount` and no limit at all,
+which is why the code was commented rather than repaired.
+
+Nothing about the silence was local.
+`BaseOptimizer` assigns it on every backtest connector it builds,
+and `OptimizerSettings` persists it to disk and reloads it,
+so a user could set the limit in the optimizer UI,
+save it, reload it, and watch every run ignore it.
+
+The property now holds its value,
+and the connector counts the messages it processes in `OnProcessMessage`,
+excluding the emulation's own state messages.
+Reaching the limit stops the run through the same `Stopping` transition
+that exhausting the data uses,
+so `IsFinished` stays true and the results collected up to that point are kept.
+The trip is gated by an interlocked exchange,
+so messages already in flight behind the limit do not re-enter the transition,
+and the counters reset on connect
+(`ClearCacheAsync` is the caller's to invoke, so it cannot be relied on)
+which keeps a reused connector from carrying the previous run's count.
+
+`MaxMessageCountBoundsTheRun` covers it,
+comparing a capped run against an uncapped one over the same two-day window.
+Against the unfixed connector it reports
+`capped produced 2881 candles, uncapped 2881` and fails.
+
+## Open, found by reading: nine defects a survey turned up
 
 A read-through of the tree on 2026-08-02 —
 `Messages`, `Algo` and its storage layer, `Algo.Strategies`,
@@ -343,18 +377,11 @@ A read-through of the tree on 2026-08-02 —
 found these.
 None is reproduced by a failing test,
 and none is fixed
-(an eleventh, the buffer flush losing data, is fixed above);
+(two more, the buffer flush losing data and the dead
+`MaxMessageCount`, are fixed above);
 each carries the file and line that supports it
 so the next reader can start from evidence rather than from this summary.
 They are ordered by consequence.
-
-**`MaxMessageCount` does nothing.**
-`Algo.Testing/HistoryEmulationConnector.cs:255-267` —
-the getter returns `-1` and the setter body is commented out under a
-bare `// TODO`.
-`Algo.Strategies/Optimization/BaseOptimizer.cs:553` sets it on every
-backtest connector it builds, and `OptimizerSettings` persists it,
-so a user-facing optimizer setting silently has no effect.
 
 **A login containing `*` or `\` cannot find itself.**
 `Configuration/Permissions/PermissionCredentialsExtensions.cs:78-95`
