@@ -300,44 +300,87 @@ windows failing makes the defect platform-independent and points the
 investigation at the IronPython `Indicators` import.
 Remove the probe once `KNOWN-ISSUES.md` records the answer.
 
-### T14. Retire the sync-facade shims — inventory done, migration staged
+### T14. Retire the sync-facade shims — inventory corrected 2026-08-02
 
-Step 1 is done, and the compiler supplies a better list than the grep
-the item proposed.
-`AsyncHelper.Run` appears at 57 sites, and almost all of them are the
-public sync surface itself —
-`StorageHelper_Obsolete` alone holds 25 —
-which record 0006 keeps until 2.0.
-The internal callers are exactly the `CS0618` warnings the Release
-build already prints, 13 of them in library code:
+An earlier pass read this inventory off the `CS0618` warnings in a CI
+build log and reported 13 sites.
+That method undercounts twice over:
+the log came from the samples workflow, which compiles four sample
+projects rather than the library solution,
+and a suppressed site emits no warning at all —
+so it excluded every `#pragma warning disable CS0618` marker,
+which is precisely what step 1 asks for.
 
-    BusinessEntities/EntitiesExtensions.cs   127, 134   RegisterOrder, ReRegisterOrder
-    Algo/TraderHelper.cs                     201        CancelOrder
-    Algo/TraderHelper.cs                     1196       Uncompress
-    Algo/Storages/Csv/CsvEntityList.cs       157        Compress
-    Algo.Strategies/Strategy.cs              90, 91     Subscribe, UnSubscribe
-    Algo.Strategies/Strategy_HighLevelMisc.cs 154       Stop
-    Algo.Strategies/Optimization/BaseOptimizer.cs 595, 636  Stop, Start
-    Algo.Strategies/Quoting/QuotingProcessor.cs 183, 200, 447  Subscribe, UnSubscribe
+The library projects carry 71 such markers:
+`Algo.Strategies` 28, `BusinessEntities` 17, `Algo` 14,
+`Messages` 11, `Diagram.Core` 1.
+They fall into three kinds, and only the first is this item's work.
 
-Watching that count fall is the item's progress measure,
-and reaching zero is what shrinks the `KNOWN-ISSUES.md` entry.
+**Internal callers on the sync facade — 31 sites, the migration target.**
+Pragma-marked:
 
-Step 2 stays open because none of the 13 is a local edit.
-Every one sits in a sync method whose signature would have to change:
+    Algo/PositionManagement/PositionTargetManager.cs   115, 155, 277, 287
+    Algo.Strategies/Quoting/QuotingProcessor.cs        159, 297, 313
+    Algo.Strategies/Strategy.cs                        814, 930, 945, 1000
+    Algo.Strategies/Strategy_TransactionProvider.cs    188, 196
+    BusinessEntities/EntitiesExtensions.cs             123, 131, 189, 2353
+
+Unsuppressed, and warning on every Release build:
+
+    Algo/TraderHelper.cs                    201, 829, 830, 831, 832, 1196
+    Algo/Storages/Csv/CsvEntityList.cs      157
+    Algo.Strategies/Strategy.cs             90, 91
+    Algo.Strategies/Strategy_HighLevelMisc.cs   154
+    Algo.Strategies/Optimization/BaseOptimizer.cs   608, 649
+    BusinessEntities/EntitiesExtensions.cs  127, 134
+
+`EntitiesExtensions.ReRegisterOrderEx` shows the split inside one method:
+`EditOrder` and `CancelOrder` sit under pragmas at 123 and 131,
+while `ReRegisterOrder` at 127 and `RegisterOrder` at 134 sit outside them.
+Suppressing all four, or none, is a one-line decision someone should make
+before the migration starts.
+
+**Compat fallbacks the divergence record keeps — 12 sites.**
+The default interface implementations in `IConnector` (126, 162),
+`ITransactionProvider` (138, 153, 168, 182, 202),
+`ISubscriptionProvider` (171, 185),
+`ISubscriptionProviderAsyncExtensions` (104, 145)
+and `IConnectorAsyncExtensions` (92)
+call the deprecated sync member so an external implementer that never
+adopted the async members keeps compiling.
+Record 0006 holds exactly that contract through 1.x,
+so these stay until the declared break.
+
+**Deprecations unrelated to the async migration — 28 sites.**
+`Strategy`'s obsolete event surface (10),
+the obsolete `StrategyOld` monolith (9),
+`Unit`/`UnitTypes` and `ExecutionTypes` in `Messages` (11 across
+`Unit.cs`, `UnitHelper.cs`, `DataType.cs`, `Extensions.cs`),
+obsolete members in `Connector`, `StorageHelper` and `CandleHelper`,
+`Security`'s Level1 legacy fields,
+and the dated `CandleSeries` format shim in `Diagram.Core`.
+These belong to their own deprecations, not to this one.
+
+Step 2 stays open, and the reason has not changed:
+none of the 31 is a local edit.
+Each sits in a sync method whose signature would have to change,
+so each is a chain reaching its callers —
 `CsvEntityList` line 157 is inside a `byte[]`-returning member,
 `TraderHelper` line 1196 inside `CreateReader`, which returns a
 `FastCsvReader`,
-and the `QuotingProcessor` and `BaseOptimizer` sites are called from
-sync event handlers where awaiting reorders delivery.
-So each one is a chain of signature changes reaching its callers,
-and the item's own rule —
-each migration compiles and passes the standard gate before the next —
-needs a local build loop rather than a CI round trip per step.
+and the `QuotingProcessor`, `PositionTargetManager` and `BaseOptimizer`
+sites are called from sync event handlers where awaiting reorders
+delivery.
+The item's own rule — each migration compiles and passes the standard
+gate before the next — needs a local build loop rather than a CI round
+trip per step.
 
-Take them one chain at a time, smallest first:
-the two compression sites reach the fewest callers,
-and the `QuotingProcessor` and ordering-internals chains reach the most.
+Take them one chain at a time, smallest first.
+Regenerate the unsuppressed half with
+`dotnet build StockSharp.slnx -c Release` and read the `CS0618` lines;
+regenerate the suppressed half with
+`grep -rn '#pragma warning disable CS0618' --include='*.cs'`.
+Both halves have to fall for the count to reach zero.
 
 ### T15. The two in-tree upstream defects — closed 2026-08-02, no work
 
