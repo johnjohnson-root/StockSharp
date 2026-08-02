@@ -1137,22 +1137,44 @@ public class ConnectorRoutingTests : BaseTestClass
 		var online = new ConcurrentDictionary<long, bool>();
 		var onlineAll = AsyncHelper.CreateTaskCompletionSource<bool>();
 
+		// The gate waits for these five transaction ids rather than for five events.
+		// Connect brings its own subscriptions up - the order-status lookup reaches
+		// Online too - so counting let one of those stand in for a tick subscription,
+		// opening the gate while one was still subscribing. Volatile because the ids
+		// are published on the test thread and read on the connector's.
+		long[] onlineIds = null;
+
+		void CheckOnline()
+		{
+			if (Volatile.Read(ref onlineIds) is { } ids && ids.All(online.ContainsKey))
+				onlineAll.TrySetResult(true);
+		}
+
 		// Gate the disconnect on every subscription actually going online instead of a timed delay.
 		// UnSubscribeAll only cleans subscriptions whose state is active, so a subscription that has
 		// not yet reached Online would be skipped and left uncleaned.
 		connector.SubscriptionOnline += sub =>
 		{
 			online[sub.TransactionId] = true;
-			if (online.Count >= expected)
-				onlineAll.TrySetResult(true);
+			CheckOnline();
 		};
 
 		// Create several subscriptions
+		var subscriptions = new List<Subscription>();
+
 		for (int i = 0; i < expected; i++)
 		{
 			var sub = new Subscription(DataType.Ticks, btcSecurity);
+			subscriptions.Add(sub);
 			connector.Subscribe(sub);
 		}
+
+		// TransactionId is assigned inside Subscribe, so the id set is known only here;
+		// the handler records every id unconditionally, so an event that arrived during
+		// the loop above is still counted by this re-check.
+		long[] subIds = [.. subscriptions.Select(s => s.TransactionId)];
+		Volatile.Write(ref onlineIds, subIds);
+		CheckOnline();
 
 		// Wait until every subscription is online before disconnecting. Identical (Ticks, BTCUSDT)
 		// subscriptions are deduplicated by the connector's online manager into a single underlying
