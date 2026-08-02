@@ -185,6 +185,54 @@ so the scripting subsystem itself is still exercised.
 The CLR namespace import failure inside the IronPython engine needs investigation;
 until then CI runs with `--filter "FullyQualifiedName!~PythonAnalyticsScripts"`.
 
+The record above names ubuntu and macos and stays silent about windows,
+because the exclusion went in before any run measured windows.
+The `Build & Tests` workflow therefore carries a probe:
+a windows-only step running those two tests alone,
+marked `continue-on-error` so its result reports without failing the job.
+Two runs of evidence decide the filter.
+Windows passing turns the wholesale exclusion into a per-OS one
+and recovers the coverage there;
+windows failing makes the defect platform-independent
+and points the investigation at the IronPython `Indicators` module import
+rather than at the runner image.
+
+## The 11 skipped tests: every ExportTests case needing a database
+
+`ExportTests` reports 11 skips on every run,
+and they are the whole class except `Cancellation`:
+`Ticks`, `Depths`, `OrderLog`, `Positions`, `News`, `Level1`,
+`Candles`, `Indicator`, `Board`, `BoardState`, and `Security`.
+
+All 11 route through the private `ExportAsync` helper,
+which ends by building a `DatabaseExporter` around
+`GetSecret("SQLSERVER_CONNECTION_STRING")`.
+`Ecng.UnitTesting.BaseTestClass.GetSecret` reports the test inconclusive
+when the secret is absent,
+and no SQL Server credential is configured for this repository,
+so the helper never returns.
+`Cancellation` is the one test in the class that does not call the helper,
+and it is the one that passes.
+
+The blocking condition is a missing credential, named exactly:
+a repository secret `SQLSERVER_CONNECTION_STRING`
+pointing at a reachable SQL Server instance.
+It is not a data file, a proprietary dependency, or an upstream defect.
+
+The coverage loss is narrower than the skip count suggests.
+Each test exports to text, XML, JSON and XLSX
+and asserts row counts and last timestamps for all four
+*before* reaching the database exporter,
+so those four paths are exercised on every CI run
+and only their outcome is mislabelled.
+The database exporter alone goes unverified.
+
+Splitting the database assertion into its own test
+would report the four file formats as passing
+and leave one honest skip instead of eleven.
+That trade costs a test method per data type,
+so it waits for someone who wants the reporting fidelity enough to pay for it.
+
 ## CI hang: resolved (flaky tests, fixed)
 
 Early CI runs aborted via `--blame-hang` after ~8 minutes of inactivity.

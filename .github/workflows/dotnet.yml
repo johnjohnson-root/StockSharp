@@ -81,6 +81,17 @@ jobs:
           echo "Retrying once: $RETRY"
           run_tests run2 "($FILTER)&($RETRY)"
 
+      - name: Probe the Python analytics exclusion (windows)
+        # The exclusion above was recorded from ubuntu and macos runs; no run has
+        # ever measured windows. This step runs the two excluded tests there alone
+        # and reports without failing the job, so two runs of evidence can turn a
+        # wholesale exclusion into a per-OS one - or confirm the defect is platform
+        # independent and send the investigation at the IronPython module import.
+        # Remove this step once KNOWN-ISSUES.md records the answer.
+        if: matrix.os == 'windows-latest'
+        continue-on-error: true
+        run: dotnet test StockSharp_Tests.slnx --no-build --configuration Release --filter "FullyQualifiedName~PythonAnalyticsScripts"
+
       - name: Upload test results (on failure)
         if: failure()
         uses: actions/upload-artifact@v4

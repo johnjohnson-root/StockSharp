@@ -270,23 +270,35 @@ the retry-once mechanism in `dotnet.yml` comes out in its own commit
 once five consecutive CI runs record no retry.
 A new tail member appears as a new entry here and in `KNOWN-ISSUES.md`.
 
-### T13. Audit the skips and the Python exclusion
+### T13. Skips and the Python exclusion — audited 2026-08-02
 
-Blocked by: nothing.
+Both answers live in `KNOWN-ISSUES.md`.
 
-1. Enumerate the 11 skipped tests
-   (`dotnet test ... --logger trx`, then read the skip reasons from the
-   trx) and the reason CI filters `PythonAnalyticsScripts` entirely.
-2. For each: re-enable with a fix, or record the precise blocking
-   condition in `KNOWN-ISSUES.md` (missing data file, proprietary
-   dependency, upstream defect — name it).
-3. The Python scripts (`Algo.Analytics.Python/`) run via
-   pythonnet/IronPython inside tests; if the exclusion is
-   environment-only (works locally, breaks on CI), say which environment
-   piece and gate the filter on it instead of excluding wholesale.
+The 11 skips are one cause, not eleven:
+every `ExportTests` case except `Cancellation` routes through the
+private `ExportAsync` helper,
+which ends by building a `DatabaseExporter` around
+`GetSecret("SQLSERVER_CONNECTION_STRING")`;
+`BaseTestClass.GetSecret` reports the test inconclusive when the secret
+is absent, and this repository configures no SQL Server credential.
+The blocking condition is that one repository secret, named exactly —
+not a data file, a proprietary dependency, or an upstream defect.
+The coverage loss is narrower than the count suggests:
+each test asserts the text, XML, JSON and XLSX exports before reaching
+the database, so those four run on every CI run and only their outcome
+is mislabelled.
+Splitting the database assertion into its own test would leave one
+honest skip instead of eleven, at a test method per data type.
 
-Done when every skip and the exclusion carries a written reason a
-future agent can act on, and anything fixable in under a day is fixed.
+The Python exclusion was recorded from ubuntu and macos alone,
+and no run has ever measured windows.
+`dotnet.yml` now carries a windows-only probe running the two excluded
+tests, `continue-on-error` so it reports without failing the job.
+Two runs of evidence settle it:
+windows passing turns the wholesale filter into a per-OS one,
+windows failing makes the defect platform-independent and points the
+investigation at the IronPython `Indicators` import.
+Remove the probe once `KNOWN-ISSUES.md` records the answer.
 
 ### T14. Retire the sync-facade shims
 
