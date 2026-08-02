@@ -49,26 +49,21 @@ A new consequential choice takes the next number in the sequence.
 
 ## Dependency sovereignty
 
-### T1. Inventory the consumed Ecng API surface
+### T1. Ecng surface inventory — done 2026-08-02
 
-Blocked by: nothing. Useful under every D1 answer.
-
-The fork consumes Ecng through `global using` directives and
-`Directory.Build.targets` pins, and nobody has measured the surface.
-
-1. List the pinned packages and versions from `Directory.Build.targets`.
-2. For each referencing project, extract every `Ecng.*` type and member
-   the compiled IL actually uses
-   (drive `System.Reflection.Metadata` over the Release assemblies,
-   or start from `grep -r "Ecng\." --include='*.cs'` and refine).
-3. Write `docs/ecng-surface.md`: one section per package,
-   member list, referencing projects, and a rough size class
-   (trivial / moderate / heavy) for replacement.
-4. Rank packages by fan-in so the smallest real dependency goes first.
-
-Verify: the document names every pinned package,
-and a spot-check of three listed members finds each in the source.
-Done when the ranking exists and D1 can be argued from data.
+`docs/ecng-surface.md` measures the closure from IL metadata:
+28 packages, 279 consumed types, 968 consumed members,
+ranked in four replacement waves.
+Waves 1–2 clear 13 packages for roughly 25 members of implementation;
+the first targets are `Ecng.Compilation.All` (zero members),
+then `Ecng.Interop` and `Ecng.Net` (one member each).
+The load-bearing finding: 86 Ecng types sit in the fork's own public
+surface across 14 packages,
+so replacing those carries a type-forwarding shim
+or a `for 2.0` record per decision 0006,
+while the 14 zero-exposure packages replace freely inside 1.x.
+The method section lists the measurement's blind spots
+(enum constants, attribute blobs, reflection-driven lookup).
 
 ### T2. Replace the next Ecng surface clean-room
 
