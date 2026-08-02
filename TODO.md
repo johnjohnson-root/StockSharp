@@ -29,73 +29,23 @@ The standard gate for any code change:
 A new test earns its place by failing on the unfixed code:
 stash the fix, build, watch the test fail, pop the stash.
 
-## Decisions the owner makes
+## Decisions
 
-Work gated on a decision waits for it.
-Record each answer as a numbered decision record under `docs/decisions/`
-(T16 creates the directory and the template).
+The five founding decisions are made
+and recorded under `docs/decisions/`:
 
-### D1. Ecng dependency strategy — open
+- **0003 — Ecng strategy**: clean-room replacement, leaves-first,
+  contract tests first; each pin drops as its consumer count reaches zero.
+- **0004 — Packaging**: ids are `StockShark.*`;
+  publishing stays artifacts-only until an external consumer exists.
+- **0005 — Samples**: rewired to project references and compiled in CI (T9).
+- **0006 — Divergence**: the drop-in `StockSharp.*` contract holds
+  through 1.x;
+  breaks queue as `for 2.0` decision records and land once, at 2.0.
+- **0007 — Watchdog**: 60 minutes (`Tests/AsmInit.cs`).
 
-`Ecng.*` and `StockSharp.Samples.HistoryData` are pinned pre-relicense
-binaries published by the upstream owner.
-Pinning plus the mirror (see `nuget-mirror/README.md`) removes the
-availability risk and leaves the evolution risk:
-that layer takes no fixes, no CVE patches, and no API growth, ever.
-The Foundation collections (`Foundation/Collections/`) already began
-clean-room replacement with contract tests.
-
-- **Clean-room replace** (recommended): continue the Foundation program
-  surface-by-surface until the pins reach zero. Slowest; cleanest provenance.
-- **Vendor last permissive source**: import the pre-relicense Ecng sources
-  as projects after a license check, dropping the binary pins at once.
-- **Hybrid**: vendor now, rewrite opportunistically.
-- **Stay pinned**: accept the frozen layer; the mirror is the safety net.
-
-Unblocks T2 and T3; T1 and T4 proceed under every answer.
-
-### D2. Package publishing — open
-
-`Pack` builds all 59 `SSharp.*` packages as CI artifacts and nothing
-publishes them.
-The `SSharp` prefix itself is a placeholder
-(`-p:ForkPackagePrefix=...` renames it in one property).
-
-- **Artifacts only** (recommended): defer until an external consumer exists.
-- **nuget.org**: reserve the prefix, add a tag-driven release workflow (T5).
-- **GitHub Packages**: distribution without public namespace; token required.
-
-Unblocks T5. Also answer: keep `SSharp`, or rename to what?
-
-### D3. Samples fate — open
-
-`Samples/**` references upstream StockSharp NuGet binaries,
-sits outside both solutions, and cannot build against this fork.
-
-- **Rewire to project references** (recommended): samples become living
-  documentation that breaks loudly when the API changes (T9).
-- **Keep as docs only**: zero cost; silent rot as the fork diverges.
-- **Drop the tree**: smallest repo; loses the onboarding ramp.
-
-Unblocks T9.
-
-### D4. Divergence policy — open
-
-Today a consumer switches from upstream by changing package ids alone:
-assembly names, namespaces, and public API stay `StockSharp.*`-compatible.
-
-- **Compatible maintenance** (recommended): hold that contract; ship fixes,
-  hardening, and internal rewrites only.
-- **Compat now, diverge at 2.0**: collect desired breaks in decision
-  records; break once, deliberately, at a declared major version.
-- **Active divergence**: refactor freely, one decision record per break.
-
-Sets the latitude for T14, T15, and every future refactor.
-
-### D5. Watchdog threshold — open, low stakes
-
-`Tests/AsmInit.cs` arms a 3-minute post-cleanup watchdog (exit 97).
-Keep 3 minutes, or change it — one constant.
+Records 0001 and 0002 cover the prose standards already in force.
+A new consequential choice takes the next number in the sequence.
 
 ## Dependency sovereignty
 
@@ -122,7 +72,8 @@ Done when the ranking exists and D1 can be argued from data.
 
 ### T2. Replace the next Ecng surface clean-room
 
-Blocked by: D1 = clean-room or hybrid. Repeatable; one surface per pass.
+Blocked by: T1's ranking. Repeatable; one surface per pass.
+Decision record 0003 sets the method.
 
 Follow the Foundation pattern end to end:
 
@@ -142,7 +93,7 @@ and `grep -r "<replaced namespace>" --include='*.cs'` finds no consumer.
 
 ### T3. Drop a pin whose surface reached zero
 
-Blocked by: a completed T2 pass (or D1 = vendor, applied per package).
+Blocked by: a completed T2 pass.
 
 1. Remove the package's pin from `Directory.Build.targets`.
 2. Run `tools/mirror-packages.sh` so the mirror matches the new closure.
@@ -175,7 +126,8 @@ Verify: dispatch the workflow manually once; it completes green today.
 
 ### T5. Tag-driven release workflow
 
-Blocked by: D2 = nuget.org or GitHub Packages.
+Blocked by: a publishing decision superseding record 0004
+(artifacts-only today).
 
 1. On tag `v*`: build, pack with `-p:ForkPackageVersion=<tag>`,
    run the standard gate, publish to the chosen feed, attach the
@@ -234,7 +186,7 @@ standard gate green; CI green on all three OSes.
 
 ### T9. Rewire Samples to project references
 
-Blocked by: D3 = rewire.
+Blocked by: nothing (decision record 0005).
 
 1. Inventory every `Samples/**/*.csproj` package reference to
    `StockSharp.*` upstream ids.
@@ -343,7 +295,10 @@ future agent can act on, and anything fixable in under a day is fixed.
 
 ### T14. Retire the sync-facade shims
 
-Blocked by: D4 (the answer sets how far the API may move).
+Blocked by: nothing.
+Record 0006 sets the latitude:
+internal callers migrate now,
+and the public sync surface holds until 2.0.
 
 `KNOWN-ISSUES.md` names the two open items from the async migration:
 `Strategy`'s ordering internals still drive the sync facade
@@ -375,24 +330,13 @@ Verify: new tests fail stashed / pass fixed; standard gate green.
 
 ## Governance and docs
 
-### T16. Create the decision-record scaffold
+### T16. Decision records — done 2026-08-02
 
-Blocked by: nothing; D1–D5 land here as they are answered.
-
-1. Create `docs/decisions/`.
-2. `0001-adopt-semantic-line-breaks.md`: Context (grep-a-whole-thought,
-   one-word-edit-one-line-diff), Decision ("We will…"), Consequences,
-   citing <https://sembr.org/> —
-   `illi-format-sweep` instructs exactly this record.
-3. `0002-adopt-the-house-voice.md`: the `illi-voice` adoption and the
-   two variant skills, with the C# and CJK clash reasoning from the
-   variants' own bodies.
-4. One record per answered decision D1–D5, numbered in answer order,
-   Status field per the `illi-voice` decision-record rules.
-
-Verify: each record follows the illi-voice format
-(sequential number, Status field, forcing-condition Context,
-"We will" Decision, costs-beside-buys Consequences).
+`docs/decisions/0001`–`0007` exist and follow the illi-voice format:
+sequential number, Status field, forcing-condition Context,
+"We will" Decision, and costs-beside-buys Consequences.
+A future decision continues the numbering;
+supersession adds a record and leaves the old one standing.
 
 ### T17. Write CONTRIBUTING.md
 
