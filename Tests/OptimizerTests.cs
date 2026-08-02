@@ -672,18 +672,26 @@ public class OptimizerTests : BaseTestClass
 		var shortParam = strategy.Parameters[nameof(SmaStrategy.Short)];
 		var longParam = strategy.Parameters[nameof(SmaStrategy.Long)];
 
-		// One iteration at a time over a small population, so the poisoned evaluation
-		// lands in the first generation and the surviving budget is what the run does
-		// after it. Without the fix the GA dies there and nothing past it evaluates.
+		// A two-chromosome population spends 2 of the 6 permitted iterations in the
+		// first generation, so the remaining 4 can only come from generations the run
+		// reaches after the poisoned evaluation. Unfixed, the GA dies in generation 1
+		// and stops at 2.
 		optimizer.EmulationSettings.BatchSize = 1;
 		optimizer.EmulationSettings.MaxIterations = 6;
 		optimizer.Settings.Population = 2;
 		optimizer.Settings.PopulationMax = 2;
-		optimizer.Settings.GenerationsMax = 10;
+		optimizer.Settings.GenerationsMax = 20;
 
 		// Stagnation would end the run on identical fitness rather than on the
 		// iteration budget, which is the thing under test here.
 		optimizer.Settings.GenerationsStagnation = 0;
+
+		// The fitness cache keys on parameter values and skips the backtest on a hit,
+		// so a converged two-chromosome population would stop consuming iterations
+		// whether or not the run survived. Mutating every offspring over the wide
+		// range below keeps fresh combinations coming, so reaching the budget
+		// measures survival rather than luck.
+		optimizer.Settings.MutationProbability = 1m;
 
 		var started = 0;
 
@@ -693,10 +701,11 @@ public class OptimizerTests : BaseTestClass
 				throw new InvalidOperationException("Poisoned iteration.");
 		};
 
+		// Step 1 over both ranges gives 21 x 41 combinations, so the cache rarely hits.
 		var geneticParams = new (IStrategyParam param, object from, object to, object step, IEnumerable values)[]
 		{
-			(shortParam, 20, 40, 5, null),
-			(longParam, 60, 100, 10, null),
+			(shortParam, 20, 40, 1, null),
+			(longParam, 60, 100, 1, null),
 		};
 
 		var results = new List<Strategy>();
@@ -706,10 +715,14 @@ public class OptimizerTests : BaseTestClass
 			results.Add(s);
 		}
 
-		// Six iterations are consumed, the first one fails, so five can report.
-		// The unfixed path stops at the first generation and reports at most one.
-		IsTrue(results.Count >= 3,
-			$"The run must continue past a failed fitness evaluation, got {results.Count} results");
+		// Iterations started is the sharp signal, not results: the run consumes its
+		// 6-iteration budget when it survives, and stops at generation 1's 2 when it
+		// does not. Result count cannot separate the two, because a chromosome whose
+		// parameters are already cached reports nothing either way.
+		IsTrue(Volatile.Read(ref started) >= 4,
+			$"The run must keep starting iterations past a failed fitness evaluation, got {started}");
+		IsTrue(results.Count >= 2,
+			$"Iterations after the failed one must report results, got {results.Count}");
 	}
 
 	/// <summary>
