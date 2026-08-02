@@ -184,26 +184,26 @@ standard gate green; CI green on all three OSes.
 
 ## Samples
 
-### T9. Rewire Samples to project references
+### T9. Samples solution and CI leg — done 2026-08-02
 
-Blocked by: nothing (decision record 0005).
-
-1. Inventory every `Samples/**/*.csproj` package reference to
-   `StockSharp.*` upstream ids.
-2. Replace each with a `ProjectReference` to the fork project of the
-   same name; leave third-party package references alone.
-3. Add `StockSharp_Samples.slnx` covering the whole tree,
-   excluding any sample that requires a proprietary connector
-   (list those in the solution-adjacent README instead).
-4. Add a CI leg that builds the samples solution on ubuntu only —
-   compile-checking documentation needs one OS.
-5. WPF-dependent samples build on windows or not at all:
-   mark them `EnableWindowsTargeting` or exclude them explicitly
-   with a comment naming the reason.
-
-Verify: `dotnet build StockSharp_Samples.slnx -c Release` green locally
-and in the new CI leg; `git grep -l 'PackageReference.*StockSharp\.'
-Samples/` returns nothing.
+The inventory overturned the premise:
+upstream's `Samples/common_samples.props` already wires the core
+by `ProjectReference`,
+and every other `StockSharp.*` package the samples reference —
+`Xaml`, `Xaml.Charting`, the connectors, `Web.Api.Client`,
+`Studio.WebApi.UI` — has no project in this repository,
+so zero references needed rewiring.
+`StockSharp_Samples.slnx` carries the four samples buildable from this
+repo alone; `.github/workflows/samples.yml` compiles it on ubuntu;
+`Samples/README.md` lists all 31 exclusions with their blocking
+dependency.
+Excluded samples keep their upstream references by design
+(record 0005 excludes them, it does not gut them),
+including the 20 Xaml.Charting samples that would compile only against
+upstream nuget.org binaries —
+a coupling already broken today by fork drift (`CS7069` in two samples).
+Growing the solution means porting a charting surface or dropping the
+WPF samples: a future decision record.
 
 ## Correctness and tests
 
