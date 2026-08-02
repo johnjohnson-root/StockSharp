@@ -130,8 +130,10 @@ and heap ordering degenerates
 to an implementation detail of the resolved Ecng.Collections version —
 `MessageByLocalTimeQueue` delivered a fully pre-queued, shuffled batch
 out of time order in CI.
-Both sites now use the signed difference.
-The `.Abs()` pattern still exists upstream.
+Both sites now use the signed difference,
+and `MessageByLocalTimeQueue_HighVolume_HandlesCorrectly` holds the contract
+by asserting sort order over a thousand messages.
+Upstream keeps the `.Abs()` comparer at both sites.
 
 The sections below carry issues inherited from upstream,
 observed on this fork's CI (GitHub-hosted runners, ubuntu/windows/macos).

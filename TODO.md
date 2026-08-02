@@ -312,19 +312,33 @@ until callers migrate.
 
 Verify: standard gate green; the KNOWN-ISSUES entry shrinks or closes.
 
-### T15. Fix the two in-tree upstream defects
+### T15. The two in-tree upstream defects — closed 2026-08-02, no work
 
-Blocked by: nothing. Both are documented with repro reasoning in
-`KNOWN-ISSUES.md`; both still exist upstream, so fixing them here is
-pure fork value.
+The item read `KNOWN-ISSUES.md` as naming two open defects.
+It names one, and that one is fixed.
 
-1. The priority-queue comparer race (`KNOWN-ISSUES.md` ~line 120):
-   apply the documented fix approach, with a regression test that
-   fails on the unfixed comparer.
-2. The `.Abs()` on `TimeSpan` overflow pattern (~line 133): same.
-3. Each fix in its own commit with the bite-check performed.
+The priority-queue comparer landed as commit `638eba8`:
+`BaseMessageQueue` and `BasketMarketDataStorage` both build
+`PriorityQueue` with the signed difference `(p1, p2) => p1 - p2`,
+and `MessageByLocalTimeQueue_HighVolume_HandlesCorrectly` asserts
+full sort order over 1,000 messages,
+which is the test that bites on a comparer that cannot report
+less-than.
+`MessageByLocalTimeQueue_EnqueueDequeue_SortsMessagesByLocalTime` and
+`InMemoryChannel_MessageByLocalTimeQueue_OutOfOrderTimes_SortsCorrectly`
+cover the same contract at unit and channel level.
 
-Verify: new tests fail stashed / pass fixed; standard gate green.
+The second entry pointed at the line
+`The .Abs() pattern still exists upstream`,
+which closes the comparer section rather than opening another:
+it says upstream kept the broken comparer, not that this tree carries
+a `TimeSpan` overflow.
+A grep for `.Abs()` and `.Duration()` over every library project finds
+no `TimeSpan`-typed call site at all —
+every hit is `decimal`, in the indicators and the tests.
+
+The remaining upstream defects worth fixing appear as their own
+`KNOWN-ISSUES.md` sections when someone finds them.
 
 ## Governance and docs
 
