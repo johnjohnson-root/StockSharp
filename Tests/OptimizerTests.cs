@@ -636,6 +636,161 @@ public class OptimizerTests : BaseTestClass
 	}
 
 	/// <summary>
+	/// Tests that one iteration failing to start costs its own chromosome
+	/// and leaves the genetic run to finish its iteration budget.
+	/// </summary>
+	/// <remarks>
+	/// Regression guard for a fitness exception reaching the GeneticSharp loop:
+	/// it leaves ga.Start() into a discarded task, which completes the channel
+	/// in its finally, so the caller reads a truncated run as a normal one.
+	/// </remarks>
+	[TestMethod]
+	public async Task GeneticRunAsyncSurvivesIterationStartFailure()
+	{
+		var security = CreateTestSecurity();
+		var portfolio = CreateTestPortfolio();
+
+		var secProvider = new CollectionSecurityProvider([security]);
+		var pfProvider = new CollectionPortfolioProvider([portfolio]);
+		var storageRegistry = GetHistoryStorage();
+
+		using var optimizer = new GeneticOptimizer(secProvider, pfProvider, storageRegistry, Paths.FileSystem);
+
+		var startTime = Paths.HistoryBeginDate;
+		var stopTime = Paths.HistoryBeginDate.AddDays(6);
+
+		var strategy = new SmaStrategy
+		{
+			Security = security,
+			Portfolio = portfolio,
+			Volume = 1,
+			CandleType = TimeSpan.FromMinutes(1).TimeFrame(),
+			Long = 80,
+			Short = 30,
+		};
+
+		var shortParam = strategy.Parameters[nameof(SmaStrategy.Short)];
+		var longParam = strategy.Parameters[nameof(SmaStrategy.Long)];
+
+		// A two-chromosome population spends 2 of the 6 permitted iterations in the
+		// first generation, so the remaining 4 can only come from generations the run
+		// reaches after the poisoned evaluation. Unfixed, the GA dies in generation 1
+		// and stops at 2.
+		//
+		// BatchSize stays at its default here, unlike the BruteForce sibling that sets
+		// it to 1. SetupGA feeds BatchSize to ParallelTaskExecutor.MaxThreads, which
+		// GeneticSharp applies to the process-wide ThreadPool, so a batch of 1 starves
+		// the emulation pipeline every iteration needs and the run collapses after the
+		// first evaluation whether or not it survived the failure.
+		optimizer.EmulationSettings.MaxIterations = 6;
+		optimizer.Settings.Population = 2;
+		optimizer.Settings.PopulationMax = 2;
+		optimizer.Settings.GenerationsMax = 20;
+
+		// Stagnation would end the run on identical fitness rather than on the
+		// iteration budget, which is the thing under test here.
+		optimizer.Settings.GenerationsStagnation = 0;
+
+		// The fitness cache keys on parameter values and skips the backtest on a hit,
+		// so a converged two-chromosome population would stop consuming iterations
+		// whether or not the run survived. Mutating every offspring over the wide
+		// range below keeps fresh combinations coming, so reaching the budget
+		// measures survival rather than luck.
+		optimizer.Settings.MutationProbability = 1m;
+
+		var started = 0;
+
+		optimizer.StrategyInitialized += (s, p) =>
+		{
+			if (Interlocked.Increment(ref started) == 1)
+				throw new InvalidOperationException("Poisoned iteration.");
+		};
+
+		// Step 1 over both ranges gives 21 x 41 combinations, so the cache rarely hits.
+		var geneticParams = new (IStrategyParam param, object from, object to, object step, IEnumerable values)[]
+		{
+			(shortParam, 20, 40, 1, null),
+			(longParam, 60, 100, 1, null),
+		};
+
+		var results = new List<Strategy>();
+
+		await foreach (var (s, _) in optimizer.RunAsync(startTime, stopTime, strategy, geneticParams, st => st.PnL, cancellationToken: CancellationToken))
+		{
+			results.Add(s);
+		}
+
+		// Iterations started is the sharp signal, not results: the run consumes its
+		// 6-iteration budget when it survives, and stops at generation 1's 2 when it
+		// does not. Result count cannot separate the two, because a chromosome whose
+		// parameters are already cached reports nothing either way.
+		IsTrue(Volatile.Read(ref started) >= 4,
+			$"The run must keep starting iterations past a failed fitness evaluation, got {started}");
+		IsTrue(results.Count >= 2,
+			$"Iterations after the failed one must report results, got {results.Count}");
+	}
+
+	/// <summary>
+	/// Tests that a token already cancelled before the genetic run starts
+	/// terminates the enumeration with no completed iterations and no hang.
+	/// </summary>
+	[TestMethod]
+	public async Task GeneticRunAsyncCancelledBeforeStart()
+	{
+		var security = CreateTestSecurity();
+		var portfolio = CreateTestPortfolio();
+
+		var secProvider = new CollectionSecurityProvider([security]);
+		var pfProvider = new CollectionPortfolioProvider([portfolio]);
+		var storageRegistry = GetHistoryStorage();
+
+		using var optimizer = new GeneticOptimizer(secProvider, pfProvider, storageRegistry, Paths.FileSystem);
+
+		var startTime = Paths.HistoryBeginDate;
+		var stopTime = Paths.HistoryBeginDate.AddDays(6);
+
+		var strategy = new SmaStrategy
+		{
+			Security = security,
+			Portfolio = portfolio,
+			Volume = 1,
+			CandleType = TimeSpan.FromMinutes(1).TimeFrame(),
+			Long = 80,
+			Short = 30,
+		};
+
+		var shortParam = strategy.Parameters[nameof(SmaStrategy.Short)];
+		var longParam = strategy.Parameters[nameof(SmaStrategy.Long)];
+
+		optimizer.EmulationSettings.MaxIterations = 10;
+
+		var geneticParams = new (IStrategyParam param, object from, object to, object step, IEnumerable values)[]
+		{
+			(shortParam, 20, 40, 5, null),
+			(longParam, 60, 100, 10, null),
+		};
+
+		using var cts = CancellationTokenSource.CreateLinkedTokenSource(CancellationToken);
+		cts.Cancel();
+
+		var count = 0;
+
+		try
+		{
+			await foreach (var _ in optimizer.RunAsync(startTime, stopTime, strategy, geneticParams, st => st.PnL, cancellationToken: cts.Token))
+			{
+				count++;
+			}
+		}
+		catch (OperationCanceledException)
+		{
+			// expected
+		}
+
+		AreEqual(0, count, "No iterations should complete when cancelled before start");
+	}
+
+	/// <summary>
 	/// Tests cancellation by iteration count inside the loop (consumer-side limit).
 	/// </summary>
 	[TestMethod]

@@ -25,7 +25,7 @@ The standard gate for any code change:
     dotnet test StockSharp_Tests.slnx --no-build -c Release \
       --filter 'FullyQualifiedName!~PythonAnalyticsScripts'
 
-4458 pass, 0 fail, 11 documented skips, prompt test-host exit.
+4463 pass, 0 fail, 11 documented skips, prompt test-host exit.
 A new test earns its place by failing on the unfixed code:
 stash the fix, build, watch the test fail, pop the stash.
 
@@ -52,11 +52,12 @@ A new consequential choice takes the next number in the sequence.
 ### T1. Ecng surface inventory — done 2026-08-02
 
 `docs/ecng-surface.md` measures the closure from IL metadata:
-28 packages, 279 consumed types, 968 consumed members,
+28 packages as measured, 279 consumed types, 968 consumed members,
 ranked in four replacement waves.
+The wave 1 rank 1 pass has since taken the closure to 27.
 Waves 1–2 clear 13 packages for roughly 25 members of implementation;
-the first targets are `Ecng.Compilation.All` (zero members),
-then `Ecng.Interop` and `Ecng.Net` (one member each).
+the first target, `Ecng.Compilation.All` (zero members), is done,
+which leaves `Ecng.Interop` and `Ecng.Net` (one member each) next.
 The load-bearing finding: 86 Ecng types sit in the fork's own public
 surface across 14 packages,
 so replacing those carries a type-forwarding shim
@@ -69,6 +70,9 @@ The method section lists the measurement's blind spots
 
 Blocked by: T1's ranking. Repeatable; one surface per pass.
 Decision record 0003 sets the method.
+Wave 1 rank 1 (`Ecng.Compilation.All`) is done —
+see the inventory's `Completed passes` section;
+the closure is 27 packages and the pin list 20 ids.
 
 Follow the Foundation pattern end to end:
 
@@ -101,21 +105,30 @@ Blocked by: a completed T2 pass.
 Verify: standard gate green; offline restore succeeds; mirror artifact
 in CI ("Mirror packages" workflow) uploads without error.
 
-### T4. Watch the pinned packages for advisories
+### T4. Advisory watch — done 2026-08-02
 
-Blocked by: nothing. Pinned packages take no patches, so watching is
-the only mitigation while any pin remains.
+`.github/workflows/advisories.yml` runs
+`dotnet list package --vulnerable --include-transitive` weekly
+and fails the run on any hit,
+so a notification names the package, severity and advisory URL.
+`dotnet list` exits 0 either way,
+so the step reads the per-project report text
+and fails loudly when a restore or the command itself breaks
+rather than reporting a clean scan over nothing.
 
-1. Add a scheduled workflow (weekly) running
-   `dotnet list StockSharp_Tests.slnx package --vulnerable --include-transitive`
-   against the pinned graph.
-2. Fail the run on any hit, so the repo owner gets a notification
-   naming the package and advisory.
-3. Document the response path in the workflow header comment:
-   an advisory against a pinned package forces the D1 conversation
-   for that package immediately.
+It scans three solutions rather than the one this item named:
+`StockSharp_Tests.slnx` misses the `Localization.Langs` satellites
+and the two `Algo.Analytics` script projects,
+and `Ecng.Interop` reaches the graph through a sample alone.
 
-Verify: dispatch the workflow manually once; it completes green today.
+The header records the response path.
+An advisory against a pinned package escalates that package's
+clean-room replacement immediately, per decision record 0003,
+because replacement is the only remedy a frozen package admits;
+a hit against an unpinned transitive package takes a version bump.
+The `pull_request` trigger on the pin files re-scans the graph
+whenever it changes, which is also what proved the workflow green —
+a schedule runs from the default branch alone.
 
 ## Packaging and release
 
@@ -166,16 +179,21 @@ still floats within constraints.
 Verify: standard gate green; a deliberate version bump of one package
 without lock regeneration fails CI in locked mode (then revert it).
 
-### T8. Pin the SDK with global.json
+### T8. SDK pin — done 2026-08-02
 
-Blocked by: nothing.
-
-1. Add `global.json` at the root:
-   the `10.0.x` SDK version CI resolves today, `rollForward: latestPatch`.
-2. Match the `setup-dotnet` versions in all three workflows.
-
-Verify: `dotnet --version` under the repo root reports the pinned line;
-standard gate green; CI green on all three OSes.
+`global.json` names 10.0.302 —
+the version CI resolved, read from a `setup-dotnet` step on master —
+with `rollForward: latestPatch` and `allowPrerelease` off,
+so the 10.0.3xx band takes patches
+and a jump to another band fails the build naming the missing version
+instead of changing compiler and analyzer behaviour silently.
+All five workflows ask `setup-dotnet` for 10.0.302 rather than `10.0.x`,
+so the runner installs exactly what the build requires.
+The `6.0.x` line stays floating:
+nothing in either solution targets net6.0,
+the entry supplies a runtime alone,
+and 6.0 is out of support so its resolved patch no longer moves.
+CI green on all three operating systems.
 
 ## Samples
 
@@ -202,31 +220,45 @@ WPF samples: a future decision record.
 
 ## Correctness and tests
 
-### T10. Bring GeneticOptimizer to BruteForce's failure semantics
-
-Blocked by: nothing.
+### T10. Genetic failure semantics — done 2026-08-02
 
 `BruteForceOptimizer` workers survive a poisoned iteration, release the
-slot, and cap consecutive failures (commits `f98b0df`, `9b57476`).
-The genetic path awaits `TryNextRunAsync` inside a GeneticSharp fitness
-evaluation and propagates every exception into the GA loop.
+slot, and cap consecutive failures.
+The genetic path had no equivalent:
+its fitness function awaits `TryNextRunAsync` inside a GeneticSharp
+evaluation, so an exception left the evaluation, left `ga.Start()`,
+and reached the driver task `RunAsync` discards —
+unobserved, while the `finally` completed the results channel.
+The caller read a run that died in its first generation as a run that
+finished.
 
-1. Read `GeneticOptimizer.cs` end to end;
-   map what GeneticSharp does with a throwing fitness function
-   (termination? silent chromosome death?) and what `CompleteChannel()`
-   at line ~462 covers.
-2. Decide and implement the parallel behavior:
-   a failed fitness evaluation scores the chromosome worthless
-   (`double.MinValue`, as the iteration-limit path already does)
-   rather than killing the run, with the error logged.
-3. Regression tests mirroring the BruteForce ones:
-   poisoned `StrategyInitialized` for one parameter set — the run
-   completes and other chromosomes evaluate;
-   pre-cancelled token — clean termination, zero results.
-4. Prove each test bites: stash the fix, watch it fail, pop.
+A failed evaluation now scores `double.MinValue` and logs the error,
+the score the iteration-limit path already returns,
+so selection ranks the chromosome last and the population breeds past
+it.
+The failure stays out of the fitness cache,
+so a transient fault does not pin a parameter set worthless for the
+rest of the run.
+`OperationCanceledException` still propagates,
+matching the filter `BruteForceOptimizer`'s worker loop uses.
 
-Verify: `--filter 'FullyQualifiedName~GeneticOptimizer|FullyQualifiedName~OptimizerTests'`
-green; new tests stable over 4 consecutive runs; standard gate green.
+`GeneticRunAsyncSurvivesIterationStartFailure` and
+`GeneticRunAsyncCancelledBeforeStart` mirror the BruteForce pair.
+The bite check ran on 2026-08-02 against a local SDK:
+with the `catch` removed the survival test fails in 2 seconds reporting
+`got 2` — the two chromosomes of the first generation and nothing
+after — and passes restored.
+
+Two configuration notes the test carries, both learned the hard way.
+`BatchSize` stays at its default here where the BruteForce sibling sets
+it to 1: `SetupGA` feeds it to `ParallelTaskExecutor.MaxThreads`, which
+GeneticSharp applies to the process-wide thread pool, so a batch of 1
+starves the emulation pipeline and the run collapses after the first
+evaluation whether or not it survived.
+And the assertion counts iterations started rather than results,
+because the fitness cache returns before starting an iteration on a hit,
+so a converged population stops producing results long before its
+budget runs out.
 
 ### T11. Reconcile the two finish predicates
 
@@ -242,86 +274,200 @@ into a comment) or align both to the conjunction.
 Verify: reasoning recorded at `CheckFinished`;
 optimizer suites green; standard gate green.
 
-### T12. Burn down the flaky tail
+### T12. Flaky tail — causes found 2026-08-02, retry removal pending
 
-Blocked by: nothing. One test per pass; the playbook is proven.
+All three documented members now have a cause and a test-only fix,
+one commit each, and `KNOWN-ISSUES.md` carries the reasoning:
 
-The documented tail (`KNOWN-ISSUES.md`, "Flaky-test tail"):
-`CandleTests.TotalPrice` ("Sequence contains more than one element"),
-`Subscriptions_RepeatedRounds_AllProcessed` (windows, ~1 min),
-`Connection_SubscriptionsCleanedOnDisconnect` (15 s timeout, seen on
-macos 2026-08-02).
+- `CandleTests.TotalPrice` built its ticks from a raw `DateTime.UtcNow`,
+  so a base time in the final second of a minute split the first two
+  ticks across candles and `Single()` threw.
+  The base time is anchored to the minute. Deterministic, not reasoned.
+- `Subscriptions_RepeatedRounds_AllProcessed` and
+  `Connection_SubscriptionsCleanedOnDisconnect` both gated on a count
+  of `SubscriptionOnline` events instead of on their own transaction
+  ids, so a late cross-round event or the connector's own order-status
+  subscription opened the gate early;
+  `UnSubscribeAll` then skipped a subscription that had not reached
+  Online, and the next wait ran to the test timeout.
+  Both gates wait for their own ids now.
+  Reasoned from the test sources rather than reproduced,
+  which is the same standard the optimizer teardown fixes met.
 
-For each test, in its own commit:
+What remains is evidence, not code:
+the retry-once mechanism in `dotnet.yml` comes out in its own commit
+once five consecutive CI runs record no retry.
+A new tail member appears as a new entry here and in `KNOWN-ISSUES.md`.
 
-1. Reproduce or reason the race from the test source:
-   the two proven classes are unsynchronized collections mutated by a
-   background task (fix: `ConcurrentQueue`, commit `1793143`) and
-   fixed sleeps racing a loaded host (fix: bounded polling, commit
-   `83c6ca2`; `WaitForMessageAsync` in `Tests/HistoryMessageAdapterTests.cs`
-   is the template).
-2. Convert the timing assumption to a polled condition with a generous
-   bound; touch nothing but the test unless the product code is provably
-   at fault.
-3. Loop the test 8 times locally; all pass.
-4. Update the tail list in `KNOWN-ISSUES.md`.
+### T13. Skips and the Python exclusion — audited 2026-08-02
 
-Done when the tail list is empty and CI's retry-once mechanism
-(`dotnet.yml`) records zero retries across five consecutive runs —
-then remove the retry mechanism in its own commit.
+Both answers live in `KNOWN-ISSUES.md`.
 
-### T13. Audit the skips and the Python exclusion
+The 11 skips are one cause, not eleven:
+every `ExportTests` case except `Cancellation` routes through the
+private `ExportAsync` helper,
+which ends by building a `DatabaseExporter` around
+`GetSecret("SQLSERVER_CONNECTION_STRING")`;
+`BaseTestClass.GetSecret` reports the test inconclusive when the secret
+is absent, and this repository configures no SQL Server credential.
+The blocking condition is that one repository secret, named exactly —
+not a data file, a proprietary dependency, or an upstream defect.
+The coverage loss is narrower than the count suggests:
+each test asserts the text, XML, JSON and XLSX exports before reaching
+the database, so those four run on every CI run and only their outcome
+is mislabelled.
+Splitting the database assertion into its own test would leave one
+honest skip instead of eleven, at a test method per data type.
 
-Blocked by: nothing.
+The Python exclusion was recorded from ubuntu and macos alone,
+and no run has ever measured windows.
+`dotnet.yml` now carries a windows-only probe running the two excluded
+tests, `continue-on-error` so it reports without failing the job.
+Two runs of evidence settle it:
+windows passing turns the wholesale filter into a per-OS one,
+windows failing makes the defect platform-independent and points the
+investigation at the IronPython `Indicators` import.
+Remove the probe once `KNOWN-ISSUES.md` records the answer.
 
-1. Enumerate the 11 skipped tests
-   (`dotnet test ... --logger trx`, then read the skip reasons from the
-   trx) and the reason CI filters `PythonAnalyticsScripts` entirely.
-2. For each: re-enable with a fix, or record the precise blocking
-   condition in `KNOWN-ISSUES.md` (missing data file, proprietary
-   dependency, upstream defect — name it).
-3. The Python scripts (`Algo.Analytics.Python/`) run via
-   pythonnet/IronPython inside tests; if the exclusion is
-   environment-only (works locally, breaks on CI), say which environment
-   piece and gate the filter on it instead of excluding wholesale.
+The audit missed a third class on its first pass,
+and `KNOWN-ISSUES.md` now carries it:
+roughly 32 tests guard on `Paths.HistoryDataPath` being null
+and `return` after a `Console.WriteLine`,
+which MSTest reports as passed with no assertion executed —
+`BacktestingTests.cs:559` (24 callers),
+`StrategyDecomposedEquivalenceTests.cs:222` (6 callers),
+and `OptimizerPauseTests.cs:81,168`.
+Six sibling sites call `Inconclusive(...)` instead,
+two of them with a comment saying why,
+so the fix is to make the three above match them.
+That is the remaining work in this item.
 
-Done when every skip and the exclusion carries a written reason a
-future agent can act on, and anything fixable in under a day is fixed.
+### T14. Retire the sync-facade shims — inventory corrected 2026-08-02
 
-### T14. Retire the sync-facade shims
+An earlier pass read this inventory off the `CS0618` warnings in a CI
+build log and reported 13 sites.
+That method undercounts twice over:
+the log came from the samples workflow, which compiles four sample
+projects rather than the library solution,
+and a suppressed site emits no warning at all —
+so it excluded every `#pragma warning disable CS0618` marker,
+which is precisely what step 1 asks for.
 
-Blocked by: nothing.
-Record 0006 sets the latitude:
-internal callers migrate now,
-and the public sync surface holds until 2.0.
+The library projects carry 71 such markers:
+`Algo.Strategies` 28, `BusinessEntities` 17, `Algo` 14,
+`Messages` 11, `Diagram.Core` 1.
+They fall into three kinds, and only the first is this item's work.
 
-`KNOWN-ISSUES.md` names the two open items from the async migration:
-`Strategy`'s ordering internals still drive the sync facade
-(pragma-marked), and `AsyncHelper.Run` shims remain in void members
-until callers migrate.
+**Internal callers on the sync facade — 31 sites, the migration target.**
+Pragma-marked, found by
+`grep -rn '#pragma warning disable CS0618' --include='*.cs'`:
 
-1. `grep -rn 'AsyncHelper.Run' --include='*.cs'` for the shim list and
-   the pragma markers for the ordering internals.
-2. Under compatible maintenance (D4), migrate internal callers to the
-   async members and shrink the shims to the public sync surface alone.
-3. Under a divergence answer, deprecate the sync surface per the policy
-   and record the break in a decision record.
+    Algo/PositionManagement/PositionTargetManager.cs   115, 155, 277, 287
+    Algo.Strategies/Quoting/QuotingProcessor.cs        159, 297, 313
+    Algo.Strategies/Strategy.cs                        814, 930, 945, 1000
+    Algo.Strategies/Strategy_TransactionProvider.cs    188, 196
+    BusinessEntities/EntitiesExtensions.cs             123, 131, 189, 2353
 
-Verify: standard gate green; the KNOWN-ISSUES entry shrinks or closes.
+Unsuppressed, read from the `CS0618` lines of a real
+`dotnet build StockSharp_Tests.slnx -c Release`:
 
-### T15. Fix the two in-tree upstream defects
+    Algo/TraderHelper.cs                            201, 1196
+    Algo/Storages/Csv/CsvEntityList.cs              157
+    Algo.Strategies/Optimization/BaseOptimizer.cs   608, 649
+    Algo.Strategies/Quoting/QuotingProcessor.cs     183, 200, 447
+    Algo.Strategies/Strategy.cs                     90, 91
+    Algo.Strategies/Strategy_HighLevelMisc.cs       154
+    BusinessEntities/EntitiesExtensions.cs          127, 134
+    Diagram.Core/Elements/OrderMassCancelDiagramElement.cs   102
 
-Blocked by: nothing. Both are documented with repro reasoning in
-`KNOWN-ISSUES.md`; both still exist upstream, so fixing them here is
-pure fork value.
+That build reports 89 distinct `CS0618` sites in all;
+the 75 not listed above sit in `Tests/`,
+which exercises the obsolete surface deliberately and stays as it is.
 
-1. The priority-queue comparer race (`KNOWN-ISSUES.md` ~line 120):
-   apply the documented fix approach, with a regression test that
-   fails on the unfixed comparer.
-2. The `.Abs()` on `TimeSpan` overflow pattern (~line 133): same.
-3. Each fix in its own commit with the bite-check performed.
+`EntitiesExtensions.ReRegisterOrderEx` shows the split inside one method:
+`EditOrder` and `CancelOrder` sit under pragmas at 123 and 131,
+while `ReRegisterOrder` at 127 and `RegisterOrder` at 134 sit outside them.
+Suppressing all four, or none, is a one-line decision someone should make
+before the migration starts.
 
-Verify: new tests fail stashed / pass fixed; standard gate green.
+**Compat fallbacks the divergence record keeps — 12 sites.**
+The default interface implementations in `IConnector` (126, 162),
+`ITransactionProvider` (138, 153, 168, 182, 202),
+`ISubscriptionProvider` (171, 185),
+`ISubscriptionProviderAsyncExtensions` (104, 145)
+and `IConnectorAsyncExtensions` (92)
+call the deprecated sync member so an external implementer that never
+adopted the async members keeps compiling.
+Record 0006 holds exactly that contract through 1.x,
+so these stay until the declared break.
+
+**Deprecations unrelated to the async migration — 28 sites.**
+`Strategy`'s obsolete event surface (10),
+the obsolete `StrategyOld` monolith (9),
+`Unit`/`UnitTypes` and `ExecutionTypes` in `Messages` (11 across
+`Unit.cs`, `UnitHelper.cs`, `DataType.cs`, `Extensions.cs`),
+obsolete members in `Connector`, `StorageHelper` and `CandleHelper`,
+`Security`'s Level1 legacy fields,
+and the dated `CandleSeries` format shim in `Diagram.Core`.
+These belong to their own deprecations, not to this one.
+
+Step 2 stays open, and the reason has not changed:
+none of the 31 is a local edit.
+Each sits in a sync method whose signature would have to change,
+so each is a chain reaching its callers —
+`CsvEntityList` line 157 is inside a `byte[]`-returning member,
+`TraderHelper` line 1196 inside `CreateReader`, which returns a
+`FastCsvReader`,
+and the `QuotingProcessor`, `PositionTargetManager` and `BaseOptimizer`
+sites are called from sync event handlers where awaiting reorders
+delivery.
+The item's own rule — each migration compiles and passes the standard
+gate before the next — needs a local build loop rather than a CI round
+trip per step.
+
+Take them one chain at a time, smallest first.
+Regenerate the unsuppressed half with
+`dotnet build StockSharp_Tests.slnx -c Release` and read the `CS0618`
+lines; regenerate the suppressed half with
+`grep -rn '#pragma warning disable CS0618' --include='*.cs'`.
+Both halves have to fall for the count to reach zero,
+and neither command finds the other's sites.
+
+Read both from the tools rather than from a summary.
+An earlier revision of this entry listed four `TraderHelper` sites at
+829-832 that do not warn at all:
+`Connector.Subscribe` is a concrete method and carries no `[Obsolete]`,
+where the `ISubscriptionProvider.Subscribe` it resembles does.
+The same revision missed the three `QuotingProcessor` sites
+and the `Diagram.Core` one.
+
+### T15. The two in-tree upstream defects — closed 2026-08-02, no work
+
+The item read `KNOWN-ISSUES.md` as naming two open defects.
+It names one, and that one is fixed.
+
+The priority-queue comparer landed as commit `638eba8`:
+`BaseMessageQueue` and `BasketMarketDataStorage` both build
+`PriorityQueue` with the signed difference `(p1, p2) => p1 - p2`,
+and `MessageByLocalTimeQueue_HighVolume_HandlesCorrectly` asserts
+full sort order over 1,000 messages,
+which is the test that bites on a comparer that cannot report
+less-than.
+`MessageByLocalTimeQueue_EnqueueDequeue_SortsMessagesByLocalTime` and
+`InMemoryChannel_MessageByLocalTimeQueue_OutOfOrderTimes_SortsCorrectly`
+cover the same contract at unit and channel level.
+
+The second entry pointed at the line
+`The .Abs() pattern still exists upstream`,
+which closes the comparer section rather than opening another:
+it says upstream kept the broken comparer, not that this tree carries
+a `TimeSpan` overflow.
+A grep for `.Abs()` and `.Duration()` over every library project finds
+no `TimeSpan`-typed call site at all —
+every hit is `decimal`, in the indicators and the tests.
+
+The remaining upstream defects worth fixing appear as their own
+`KNOWN-ISSUES.md` sections when someone finds them.
 
 ## Governance and docs
 
@@ -333,59 +479,60 @@ sequential number, Status field, forcing-condition Context,
 A future decision continues the numbering;
 supersession adds a record and leaves the old one standing.
 
-### T17. Write CONTRIBUTING.md
+### T17. CONTRIBUTING.md — done 2026-08-02
 
-Blocked by: nothing.
+One page in lifecycle order:
+what the fork is, build and test, prose, commits and pull requests,
+decisions, license.
+The build section carries the standard gate verbatim
+and says what a green run reports,
+including why 11 tests skip and why the Python filter is there,
+so a newcomer reaches a green gate from this file alone.
 
-One page, lifecycle order:
+Two conventions are written down for the first time:
+a regression test earns its place by failing on the unfixed code,
+and the commit body says so and what the failure looked like;
+a comment-only change carries a code-identity check.
+The decisions section states the record format
+and names `0006` as the one most changes touch.
 
-1. Definition: what this fork is (one paragraph; `README.md`'s fork
-   section is the source).
-2. Build and test: the two commands from the standard gate.
-3. Prose rules: point at `.claude/skills/` — voice for wording,
-   format-sweep for line breaks, the variants for C# and CJK.
-4. Commit and PR shape: the illi-voice commit rules,
-   plus the fork's proof conventions
-   (regression tests demonstrate they bite; comment-only changes carry
-   a code-identity check).
-5. The decision-record process (T16) for anything consequential.
+### T18. CHANGELOG.md — done 2026-08-02
 
-Verify: a newcomer reaches a green standard gate following only this
-file; every referenced path exists.
+Seeded from the fork's shipped work,
+written from what a consumer observes rather than from what the commits
+touched, under Added / Changed / Fixed / Security headings.
+Everything sits in `Unreleased`,
+because record 0004 keeps packages as CI artifacts until a feed exists.
 
-### T18. Seed CHANGELOG.md
+The compare link resolves against `22ca8fb`,
+upstream's last Apache-2.0 commit and this fork's declared base,
+because the repository carries no tags yet.
+Cutting a release means adding a version heading above `Unreleased`
+and pointing a new compare link at the tag (T5).
 
-Blocked by: nothing (T5 consumes it later).
+### T19. .editorconfig — done 2026-08-02, two sweeps deferred
 
-1. Follow the illi-voice changelog rules:
-   observable behavior first, kind labels
-   (Added/Changed/Fixed/Security), ISO dates, newest first,
-   bracketed versions as compare links.
-2. Seed an Unreleased section from the fork's shipped work:
-   the license preservation, the standalone build, the Foundation
-   collections, the async migration, the optimizer hardening,
-   pin/mirror, packaging, and the prose sweep —
-   `git log --oneline master` is the source; write what a consumer
-   observes, one line each.
+Encodes what the tree measurably does:
+tabs in `.cs` (384 of a 400-file sample, none at four spaces),
+LF everywhere (1,636 of 1,637 tracked `.cs` files;
+`Algo/TraderHelper.cs` is the one CRLF file),
+two-space indent for the XML, YAML, JSON and Markdown families,
+tabs in shell scripts,
+and the `illi-voice-csharp` doc-comment adjacency rule.
 
-Verify: every entry names observable behavior, none names only a
-commit; dates ISO; compare links resolve.
+Two settings the item asked for are deliberately unset,
+because the tree is not uniform about either
+and setting one would rewrite hundreds of files on the next format —
+which the item's own verification forbids:
 
-### T19. Add .editorconfig
+    byte-order mark   533 .cs files carry one, 931 do not
+    final newline     789 .cs files end with one, 675 do not
 
-Blocked by: nothing.
-
-1. Encode what the tree already does — tabs in `.cs` (match the
-   existing files), UTF-8, LF, final newline —
-   plus the doc-comment adjacency the `illi-voice-csharp` variant
-   states (no blank line between `///` and member).
-2. Add the analyzer severities only where the codebase is already
-   clean; introduce no new warnings
-   (the build's warning set is the regression surface —
-   compare before/after).
-
-Verify: `dotnet build` warning count unchanged; `git diff` after an
-IDE format of one untouched file is empty.
+Each is a tree-wide sweep in its own commit,
+after which the value belongs in `.editorconfig`.
+No analyzer severities: adding one changes the build's warning set,
+and the honest way to add it is to compare warning counts across a real
+build, a rule at a time.
 
 ### T20. Optional: sweep the upstream C# comment surface
 

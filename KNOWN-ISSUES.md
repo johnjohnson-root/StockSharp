@@ -32,14 +32,38 @@ stay until callers migrate.
 ## Flaky-test tail (CI retries failed tests once)
 
 Beyond the deterministic fixes below,
-the suite carries a long tail of low-probability timing-sensitive tests:
-each 3-OS run (~13k test executions) surfaces 1–3 different failures,
-drawn so far from `CandleTests.TotalPrice` ("Sequence contains more than one element"),
-`Subscriptions_RepeatedRounds_AllProcessed` (windows, ~1 min),
-and `Connection_SubscriptionsCleanedOnDisconnect`.
-CI therefore retries exactly the failed tests once,
+the suite carried a long tail of low-probability timing-sensitive tests:
+each 3-OS run (~13k test executions) surfaced 1–3 different failures,
+drawn from three tests.
+Each one now has an identified cause and a test-only fix,
+so the tail list is empty:
+
+- `CandleTests.TotalPrice` ("Sequence contains more than one element")
+  built its ticks from a raw `DateTime.UtcNow` at +0s, +1s and +1min
+  and asserted the first two share one 1-minute candle.
+  A base time in the final second of a minute put the +1s tick
+  in the next candle,
+  so `Process` returned two candles and `Single()` threw —
+  one second in sixty, about 1.7% of runs.
+  The base time is anchored to the start of the minute.
+- `Subscriptions_RepeatedRounds_AllProcessed` (windows, ~1 min)
+  and `Connection_SubscriptionsCleanedOnDisconnect` (macos, 15 s)
+  both gated on a *count* of `SubscriptionOnline` events
+  rather than on the transaction ids they had just created.
+  A late event crossing a round boundary, or the connector's own
+  order-status subscription reaching Online,
+  stood in for a subscription still subscribing;
+  the gate opened early, `UnSubscribeAll` skipped that subscription
+  because it cleans active ones alone,
+  and the following wait ran to the test timeout.
+  Both gates now wait for their own ids.
+  Reasoned from the test sources rather than reproduced.
+
+CI still retries exactly the failed tests once,
 and a test that fails twice fails the job.
-All tests stay active, the tail included.
+The retry mechanism comes out once five consecutive runs record no retry,
+which is the evidence that the tail is closed rather than quiet.
+All tests stay active.
 
 One member of the tail is now fixed here.
 The `--blame-hang` sequence file twice named
@@ -130,8 +154,10 @@ and heap ordering degenerates
 to an implementation detail of the resolved Ecng.Collections version —
 `MessageByLocalTimeQueue` delivered a fully pre-queued, shuffled batch
 out of time order in CI.
-Both sites now use the signed difference.
-The `.Abs()` pattern still exists upstream.
+Both sites now use the signed difference,
+and `MessageByLocalTimeQueue_HighVolume_HandlesCorrectly` holds the contract
+by asserting sort order over a thousand messages.
+Upstream keeps the `.Abs()` comparer at both sites.
 
 The sections below carry issues inherited from upstream,
 observed on this fork's CI (GitHub-hosted runners, ubuntu/windows/macos).
@@ -159,6 +185,91 @@ so the scripting subsystem itself is still exercised.
 The CLR namespace import failure inside the IronPython engine needs investigation;
 until then CI runs with `--filter "FullyQualifiedName!~PythonAnalyticsScripts"`.
 
+The record above names ubuntu and macos and stays silent about windows,
+because the exclusion went in before any run measured windows.
+The `Build & Tests` workflow therefore carries a probe:
+a windows-only step running those two tests alone,
+marked `continue-on-error` so its result reports without failing the job.
+Two runs of evidence decide the filter.
+Windows passing turns the wholesale exclusion into a per-OS one
+and recovers the coverage there;
+windows failing makes the defect platform-independent
+and points the investigation at the IronPython `Indicators` module import
+rather than at the runner image.
+
+## The 11 skipped tests: every ExportTests case needing a database
+
+`ExportTests` reports 11 skips on every run,
+and they are the whole class except `Cancellation`:
+`Ticks`, `Depths`, `OrderLog`, `Positions`, `News`, `Level1`,
+`Candles`, `Indicator`, `Board`, `BoardState`, and `Security`.
+
+All 11 route through the private `ExportAsync` helper,
+which ends by building a `DatabaseExporter` around
+`GetSecret("SQLSERVER_CONNECTION_STRING")`.
+`Ecng.UnitTesting.BaseTestClass.GetSecret` reports the test inconclusive
+when the secret is absent,
+and no SQL Server credential is configured for this repository,
+so the helper never returns.
+`Cancellation` is the one test in the class that does not call the helper,
+and it is the one that passes.
+
+The blocking condition is a missing credential, named exactly:
+a repository secret `SQLSERVER_CONNECTION_STRING`
+pointing at a reachable SQL Server instance.
+It is not a data file, a proprietary dependency, or an upstream defect.
+
+The coverage loss is narrower than the skip count suggests.
+Each test exports to text, XML, JSON and XLSX
+and asserts row counts and last timestamps for all four
+*before* reaching the database exporter,
+so those four paths are exercised on every CI run
+and only their outcome is mislabelled.
+The database exporter alone goes unverified.
+
+Splitting the database assertion into its own test
+would report the four file formats as passing
+and leave one honest skip instead of eleven.
+That trade costs a test method per data type,
+so it waits for someone who wants the reporting fidelity enough to pay for it.
+
+## Roughly 32 history-data tests pass silently when the data is absent
+
+The 11 skips above are the visible half of the story.
+The invisible half is larger:
+about 32 tests check `Paths.HistoryDataPath` for null,
+print a line to the console, and `return` —
+which MSTest reports as **passed**, having executed no assertion at all.
+
+    Tests/BacktestingTests.cs:559                  SkipIfNoHistoryData(), 24 callers
+    Tests/StrategyDecomposedEquivalenceTests.cs:222   SkipIfNoHistoryData(), 6 callers
+    Tests/OptimizerPauseTests.cs:81, 168           inline, 2 tests
+
+The same codebase does it correctly in six other places,
+which is what makes this a defect rather than a convention:
+`PathsTests.cs:25,47,57`,
+`StrategyReferenceSurfaceTests.cs:776`,
+`StrategyDecomposedFullEquivalenceTests.cs:1107`,
+and `StrategyDecomposedEquivalenceTests.cs:2724`
+all call `Inconclusive(...)` instead,
+and two of them carry a comment saying why —
+"Not a silent pass: without market data a zero-vs-zero comparison
+would be meaningless."
+
+`Paths.HistoryDataPath` resolves by walking the NuGet global-packages
+folder for `stocksharp.samples.historydata`,
+so it is null wherever that package has not been restored.
+CI restores it today and these tests do run there.
+The exposure is a CI image or a contributor machine where the package
+is missing:
+the backtesting and strategy-equivalence suites would report green
+while asserting nothing,
+and nothing in the run output would distinguish that from real coverage.
+
+The fix is mechanical —
+`return` becomes `Inconclusive(...)` at the three sites above —
+and it converts a silent 32-test hole into 32 visible skips.
+
 ## CI hang: resolved (flaky tests, fixed)
 
 Early CI runs aborted via `--blame-hang` after ~8 minutes of inactivity.
@@ -178,3 +289,176 @@ Independently, `Tests/Helper.cs`'s static `LogManager` is now disposed in `[Asse
 and `SubscriptionHolderTests` no longer leaks per-holder `LogManager` instances.
 CI uploads `TestResults` (blame sequence + hang dumps) on failure
 should anything recur.
+
+## Fixed here: a failed storage save discarded the buffered data
+
+`BufferMessageAdapter`'s 10-second flush cycle read each buffer through
+`Buffer.GetXxx()`, which snapshots and clears in one step
+(`StorageBuffer.cs:16-22`),
+and wrapped the whole cycle in a single log-only `try`/`catch`.
+Any `SaveAsync` that threw therefore stranded every message already taken
+in that cycle:
+out of the buffer, never in storage, and owned by nobody.
+The loss reached past the failing security —
+one dictionary from `GetTicks()` carries every security,
+and the throw abandoned the rest of it along with every later buffer kind.
+
+The cycle now keeps what it could not persist.
+Each kind is saved key by key through `SaveEachAsync`,
+which merges the previous cycle's leftovers with the fresh batch,
+saves each key on its own,
+and holds a key whose save throws for the next cycle
+while the remaining keys still go out.
+A backlog is bounded at 100,000 messages per key,
+and passing it drops the oldest with a warning
+rather than growing until the process dies.
+
+Transactions are the exception, and deliberately:
+that path consumes `_replaceTransactions` entries as it walks the batch,
+so a second pass would take different branches.
+Its per-security failures are caught and logged instead,
+which still stops one security from abandoning the others.
+
+Two defects in the same loop went with it.
+The cycle's `interval.Delay` sat inside the `try`,
+so a cycle that threw skipped the wait
+and the loop spun at full speed for as long as storage kept failing;
+the delay now runs outside it.
+`StopStorageTimer`'s three bare `catch { }` blocks log,
+with the cancellation the one-second wait legitimately produces
+filtered out.
+
+`BufferedTicksSurviveAFailedSave` covers the regression:
+storage refuses the first save and accepts afterwards,
+and the tick has to reach it on a later cycle.
+Against the unfixed adapter the test reports
+"storage saw 1 attempt(s)" and fails after 45 seconds,
+because no second attempt ever comes.
+
+## Fixed here: MaxMessageCount was a setting that did nothing
+
+`HistoryEmulationConnector.MaxMessageCount` documented itself as
+"maximum number of messages processed during backtesting",
+and it was inert:
+the getter returned `-1` whatever was assigned,
+and the setter's body was commented out under a bare `// TODO`,
+pointing at an `InMemoryMessageChannel.MaxMessageCount` that does not exist —
+that channel exposes a read-only `MessageCount` and no limit at all,
+which is why the code was commented rather than repaired.
+
+Nothing about the silence was local.
+`BaseOptimizer` assigns it on every backtest connector it builds,
+and `OptimizerSettings` persists it to disk and reloads it,
+so a user could set the limit in the optimizer UI,
+save it, reload it, and watch every run ignore it.
+
+The property now holds its value,
+and the connector counts the messages it processes in `OnProcessMessage`,
+excluding the emulation's own state messages.
+Reaching the limit stops the run through the same `Stopping` transition
+that exhausting the data uses,
+so `IsFinished` stays true and the results collected up to that point are kept.
+The trip is gated by an interlocked exchange,
+so messages already in flight behind the limit do not re-enter the transition,
+and the counters reset on connect
+(`ClearCacheAsync` is the caller's to invoke, so it cannot be relied on)
+which keeps a reused connector from carrying the previous run's count.
+
+`MaxMessageCountBoundsTheRun` covers it,
+comparing a capped run against an uncapped one over the same two-day window.
+Against the unfixed connector it reports
+`capped produced 2881 candles, uncapped 2881` and fails.
+
+## Open, found by reading: nine defects a survey turned up
+
+A read-through of the tree on 2026-08-02 —
+`Messages`, `Algo` and its storage layer, `Algo.Strategies`,
+`Algo.Testing`, `MatchingEngine`, the entity projects, and `Tests` —
+found these.
+None is reproduced by a failing test,
+and none is fixed
+(two more, the buffer flush losing data and the dead
+`MaxMessageCount`, are fixed above);
+each carries the file and line that supports it
+so the next reader can start from evidence rather than from this summary.
+They are ordered by consequence.
+
+**A login containing `*` or `\` cannot find itself.**
+`Configuration/Permissions/PermissionCredentialsExtensions.cs:78-95`
+escapes a literal `*` as `\*` before calling
+`FileCredentialsStorage.SearchAsync` (`:61-64`),
+which applies `Regex.Escape(...).Replace("\*", ".*")` to the result and
+consumes the wrong pair.
+The lookup misses the real login and can match an unrelated one
+containing a backslash.
+
+**The decomposed strategy no longer defers subscribes.**
+`Algo.Strategies/SubscriptionRegistry.cs:16,42-64,107-127` implements
+`SuspendRules`/`ResumeRules`/`IsRulesSuspended`,
+and nothing calls them outside their own unit test.
+In the monolith one shared counter gated both rule activation and the
+wire-level subscribe (`Legacy/StrategyOld_SubscriptionProvider.cs:133-141,168-177`);
+`Strategy`'s container (`Strategy_MarketRulesAndMisc.cs:106-119`) touches
+only its own counter.
+So `SuspendRules(() => { ... Subscribe ... })` at
+`Quoting/QuotingProcessor.cs:141-146` no longer defers the subscribe,
+and no equivalence test covers the difference.
+
+**Price-time priority rests on dictionary order.**
+`MatchingEngine/OrderBook.cs:8,15` holds each book level as a
+`Dictionary<long, EmulatorOrder>`,
+and `ConsumeVolume` (`:444`) walks that order to decide which same-price
+orders fill first.
+For a matching engine that is a contract rather than an implementation
+detail, and `OrderMatcherTests`/`OrderBookTests` do not pin it.
+
+**`GetActiveOrders` ignores its security.**
+`MatchingEngine/IOrderLifecycleManager.cs:180-185` returns every active
+order whatever `SecurityId` it is given —
+its own comment concedes orders do not carry one.
+The single caller (`MatchingEngineAdapter.cs:1138`) is correct only
+because it reaches a manager already scoped per security,
+which is caller topology rather than a guarantee,
+and no test exercises the overload.
+
+**Shared state mutated outside its lock.**
+`Algo/Connector_SubscriptionManager.cs:317-321` adds to `_notFound`
+without holding `_syncObject`, from two paths that have already left it
+(`:349-350`, `:482`), while every sibling collection in the class is
+guarded.
+`Algo/EntityCache.cs:962-974` does a non-atomic read-modify-write on
+`_ordersAvgPrices`.
+Both are masked today by the single-consumer loop in
+`InMemoryMessageChannel`, which nothing enforces.
+`Localization/LocalizedStrings.cs:45-46,124-143,180-208` is the same
+shape without the mask: plain collections written by `AddLanguage` and
+`ActiveLanguage` while `GetString` reads them.
+
+**A test mints duplicate transaction ids.**
+`Tests/StrategyPositionManagerTests.cs:6` increments a
+`private static long _tx` with `++_tx` at 15 sites.
+The class is not `[DoNotParallelize]` and the assembly runs
+`Parallelize(MethodLevel)` (`Tests/Properties/AssemblyInfo.cs:12`),
+so two of its methods can hand the same id to fixtures meant to be
+independent.
+
+**Cancellation paths swallow every error silently.**
+`Messages/IMessageAdapterAsyncExtensions.cs:202-213` and `:451-472`
+catch and discard, holding an `ILogReceiver` the whole time.
+`Messages/AsyncMessageChannel.cs:104,116,120,128` has four bare
+`catch { }` in `Close()`, in a class that logs everywhere else.
+
+**Nothing guards message cloning.**
+Every `Message` subtype hand-writes `Clone`/`CopyTo`
+(`Messages/Message.cs:115-130` and each subclass),
+so a field added without touching both vanishes on clone with no test
+failing.
+`MessageTypes` compounds it: the enum carries no explicit values, so
+member order is wire identity, and 31 obsolete members are retained
+only to hold later ordinals.
+
+**Storage I/O claims to be async and is not.**
+`Algo/Storages/LocalMarketDataDrive.cs:156-191` —
+`SaveStreamAsync` and `LoadStreamAsync` call blocking `OpenWrite`,
+`Open` and `CopyTo` on an `IFileSystem` whose real async members the
+same file uses at `:985`.

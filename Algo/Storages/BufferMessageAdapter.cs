@@ -271,6 +271,83 @@ public class BufferMessageAdapter(IMessageAdapter innerAdapter, StorageCoreSetti
 	private Task _storageTask;
 	private readonly Lock _timerSync = new();
 
+	// Batches taken from the buffer and not yet persisted. Buffer.GetXxx() reads and
+	// clears in one step, so a save that throws leaves its messages owned by nobody:
+	// they are already out of the buffer and never reached storage. These carry them
+	// to the next cycle instead. Only the storage task touches them.
+	private readonly Dictionary<SecurityId, List<ExecutionMessage>> _unsavedTicks = [];
+	private readonly Dictionary<SecurityId, List<ExecutionMessage>> _unsavedOrderLog = [];
+	private readonly Dictionary<SecurityId, List<QuoteChangeMessage>> _unsavedOrderBooks = [];
+	private readonly Dictionary<SecurityId, List<Level1ChangeMessage>> _unsavedLevel1 = [];
+	private readonly Dictionary<SecurityId, List<PositionChangeMessage>> _unsavedPositions = [];
+	private readonly Dictionary<(SecurityId secId, DataType dataType), List<CandleMessage>> _unsavedCandles = [];
+	private readonly List<NewsMessage> _unsavedNews = [];
+	private readonly List<BoardStateMessage> _unsavedBoardStates = [];
+
+	// A backlog that never drains would grow until the process dies, which is a worse
+	// failure than the one this retry prevents. Past this many messages for one key the
+	// oldest go, and the drop is logged rather than silent.
+	private const int _maxUnsavedPerKey = 100_000;
+
+	/// <summary>
+	/// Merges what the previous cycle could not persist with what the buffer just handed
+	/// over, then saves each key on its own.
+	/// </summary>
+	/// <remarks>
+	/// A key whose save throws keeps its batch for the next cycle and the remaining keys
+	/// still go out, where one throw previously abandoned every key behind it.
+	/// </remarks>
+	private async ValueTask SaveEachAsync<TKey, TMessage>(
+		Dictionary<TKey, List<TMessage>> unsaved,
+		IDictionary<TKey, IEnumerable<TMessage>> fresh,
+		Func<TKey, IEnumerable<TMessage>, ValueTask> save,
+		CancellationToken token)
+		where TMessage : Message
+	{
+		foreach (var pair in fresh)
+			Append(unsaved.SafeAdd(pair.Key), pair.Value, pair.Key);
+
+		foreach (var key in unsaved.Keys.ToArray())
+		{
+			token.ThrowIfCancellationRequested();
+
+			var batch = unsaved[key];
+
+			if (batch.Count == 0)
+			{
+				unsaved.Remove(key);
+				continue;
+			}
+
+			try
+			{
+				await save(key, batch);
+				unsaved.Remove(key);
+			}
+			catch (Exception ex)
+			{
+				if (token.IsCancellationRequested)
+					throw;
+
+				// The batch stays in unsaved, so the next cycle retries it.
+				LogError("Saving {0} failed, {1} message(s) held for retry: {2}", key, batch.Count, ex.Message);
+			}
+		}
+	}
+
+	private void Append<TMessage>(List<TMessage> batch, IEnumerable<TMessage> messages, object key)
+	{
+		batch.AddRange(messages);
+
+		var excess = batch.Count - _maxUnsavedPerKey;
+
+		if (excess <= 0)
+			return;
+
+		batch.RemoveRange(0, excess);
+		LogWarning("Storage backlog for {0} passed {1}; dropped {2} oldest message(s).", key, _maxUnsavedPerKey, excess);
+	}
+
 	/// <summary>
 	/// Start storage auto-save thread.
 	/// </summary>
@@ -294,17 +371,17 @@ public class BufferMessageAdapter(IMessageAdapter innerAdapter, StorageCoreSetti
 						var incremental = Settings.IsMode(StorageModes.Incremental);
 						var snapshot = Settings.IsMode(StorageModes.Snapshot);
 
-						foreach (var pair in Buffer.GetTicks())
+						await SaveEachAsync(_unsavedTicks, Buffer.GetTicks(), async (secId, messages) =>
 						{
 							if (incremental)
-								await Settings.GetStorage<ExecutionMessage>(pair.Key, DataType.Ticks).SaveAsync(pair.Value, token);
-						}
+								await Settings.GetStorage<ExecutionMessage>(secId, DataType.Ticks).SaveAsync(messages, token);
+						}, token);
 
-						foreach (var pair in Buffer.GetOrderLog())
+						await SaveEachAsync(_unsavedOrderLog, Buffer.GetOrderLog(), async (secId, messages) =>
 						{
 							if (incremental)
-								await Settings.GetStorage<ExecutionMessage>(pair.Key, DataType.OrderLog).SaveAsync(pair.Value, token);
-						}
+								await Settings.GetStorage<ExecutionMessage>(secId, DataType.OrderLog).SaveAsync(messages, token);
+						}, token);
 
 						foreach (var pair in Buffer.GetTransactions())
 						{
@@ -314,90 +391,105 @@ public class BufferMessageAdapter(IMessageAdapter innerAdapter, StorageCoreSetti
 							if (secId == default)
 								continue;
 
-							if (incremental)
-								await Settings.GetStorage<ExecutionMessage>(secId, DataType.Transactions).SaveAsync(pair.Value, token);
-
-							if (snapshot)
+							try
 							{
-								var snapshotStorage = GetSnapshotStorage<string, ExecutionMessage>(DataType.Transactions);
+								if (incremental)
+									await Settings.GetStorage<ExecutionMessage>(secId, DataType.Transactions).SaveAsync(pair.Value, token);
 
-								foreach (var message in pair.Value)
+								if (snapshot)
 								{
-									// do not store cancellation commands into snapshot
-									if (message.IsCancellation)
+									var snapshotStorage = GetSnapshotStorage<string, ExecutionMessage>(DataType.Transactions);
+
+									foreach (var message in pair.Value)
 									{
-										LogWarning("Cancellation transaction: {0}", message);
-										continue;
-									}
+										// do not store cancellation commands into snapshot
+										if (message.IsCancellation)
+										{
+											LogWarning("Cancellation transaction: {0}", message);
+											continue;
+										}
 
-									var originTransId = message.OriginalTransactionId;
+										var originTransId = message.OriginalTransactionId;
 
-									if (originTransId == 0)
-										continue;
-
-									if (_cancellationTransactions.TryGetValue(originTransId, out var cancelledId))
-									{
-										// do not store cancellation errors
-										if (!message.IsOk())
+										if (originTransId == 0)
 											continue;
 
-										// override cancel trans id by original order's registration trans id
-										originTransId = cancelledId;
-									}
-									else if (_orderStatusIds.Contains(originTransId))
-									{
-										// override status request trans id by original order's registration trans id
-										originTransId = message.TransactionId;
-									}
-									else if (_replaceTransactions.TryGetAndRemove(originTransId, out var replacedId))
-									{
-										if (message.IsOk())
+										if (_cancellationTransactions.TryGetValue(originTransId, out var cancelledId))
 										{
-											var replaced = (ExecutionMessage)snapshotStorage.Get(replacedId.To<string>());
+											// do not store cancellation errors
+											if (!message.IsOk())
+												continue;
 
-											if (replaced == null)
-												LogWarning("Replaced order {0} not found.", replacedId);
-											else
+											// override cancel trans id by original order's registration trans id
+											originTransId = cancelledId;
+										}
+										else if (_orderStatusIds.Contains(originTransId))
+										{
+											// override status request trans id by original order's registration trans id
+											originTransId = message.TransactionId;
+										}
+										else if (_replaceTransactions.TryGetAndRemove(originTransId, out var replacedId))
+										{
+											if (message.IsOk())
 											{
-												if (replaced.OrderState != OrderStates.Done)
-													replaced.OrderState = OrderStates.Done;
+												var replaced = (ExecutionMessage)snapshotStorage.Get(replacedId.To<string>());
+
+												if (replaced == null)
+													LogWarning("Replaced order {0} not found.", replacedId);
+												else
+												{
+													if (replaced.OrderState != OrderStates.Done)
+														replaced.OrderState = OrderStates.Done;
+												}
 											}
 										}
+
+										message.SecurityId = secId;
+
+										if (message.TransactionId == 0)
+											message.TransactionId = originTransId;
+
+										message.OriginalTransactionId = 0;
+
+										if (message.TransactionId != 0)
+											SaveTransaction(snapshotStorage, message);
 									}
-
-									message.SecurityId = secId;
-
-									if (message.TransactionId == 0)
-										message.TransactionId = originTransId;
-
-									message.OriginalTransactionId = 0;
-
-									if (message.TransactionId != 0)
-										SaveTransaction(snapshotStorage, message);
 								}
+							}
+							catch (Exception ex)
+							{
+								if (token.IsCancellationRequested)
+									throw;
+
+								// Not held for retry, unlike the other kinds: the snapshot path
+								// consumes _replaceTransactions entries as it goes, so a second
+								// pass over the same batch would take a different branch. What
+								// this guard buys is that one security's failure costs its own
+								// batch instead of abandoning every security behind it.
+								LogError("Saving transactions for {0} failed, batch lost: {1}", secId, ex.Message);
 							}
 						}
 
-						foreach (var pair in Buffer.GetOrderBooks())
+						await SaveEachAsync(_unsavedOrderBooks, Buffer.GetOrderBooks(), async (secId, messages) =>
 						{
 							if (incremental)
-								await Settings.GetStorage<QuoteChangeMessage>(pair.Key, DataType.MarketDepth).SaveAsync(pair.Value, token);
+								await Settings.GetStorage<QuoteChangeMessage>(secId, DataType.MarketDepth).SaveAsync(messages, token);
 
 							if (snapshot)
 							{
 								var snapshotStorage = GetSnapshotStorage<QuoteChangeMessage>(DataType.MarketDepth);
 
-								foreach (var message in pair.Value)
+								foreach (var message in messages)
 									snapshotStorage.Update(message);
 							}
-						}
+						}, token);
 
-						foreach (var pair in Buffer.GetLevel1())
+						await SaveEachAsync(_unsavedLevel1, Buffer.GetLevel1(), async (secId, buffered) =>
 						{
-							var messages = pair.Value.Where(m => m.HasChanges()).ToArray();
+							var messages = buffered.Where(m => m.HasChanges()).ToArray();
 
 							if (incremental)
-								await Settings.GetStorage<Level1ChangeMessage>(pair.Key, DataType.Level1).SaveAsync(messages, token);
+								await Settings.GetStorage<Level1ChangeMessage>(secId, DataType.Level1).SaveAsync(messages, token);
 
 							if (Settings.IsMode(StorageModes.Snapshot))
 							{
@@ -406,19 +498,19 @@ public class BufferMessageAdapter(IMessageAdapter innerAdapter, StorageCoreSetti
 								foreach (var message in messages)
 									snapshotStorage.Update(message);
 							}
-						}
+						}, token);
 
-						foreach (var pair in Buffer.GetCandles())
+						await SaveEachAsync(_unsavedCandles, Buffer.GetCandles(), async (key, messages) =>
 						{
-							await Settings.GetStorage(pair.Key.secId, pair.Key.dataType).SaveAsync(pair.Value, token);
-						}
+							await Settings.GetStorage(key.secId, key.dataType).SaveAsync(messages, token);
+						}, token);
 
-						foreach (var pair in Buffer.GetPositionChanges())
+						await SaveEachAsync(_unsavedPositions, Buffer.GetPositionChanges(), async (secId, buffered) =>
 						{
-							var messages = pair.Value.Where(m => m.HasChanges()).ToArray();
+							var messages = buffered.Where(m => m.HasChanges()).ToArray();
 
 							if (incremental)
-								await Settings.GetStorage<PositionChangeMessage>(pair.Key, DataType.PositionChanges).SaveAsync(messages, token);
+								await Settings.GetStorage<PositionChangeMessage>(secId, DataType.PositionChanges).SaveAsync(messages, token);
 
 							if (snapshot)
 							{
@@ -427,28 +519,41 @@ public class BufferMessageAdapter(IMessageAdapter innerAdapter, StorageCoreSetti
 								foreach (var message in messages)
 									snapshotStorage.Update(message);
 							}
-						}
+						}, token);
 
-						var news = Buffer.GetNews().ToArray();
+						Append(_unsavedNews, Buffer.GetNews(), DataType.News);
 
-						if (news.Length > 0)
+						if (_unsavedNews.Count > 0)
 						{
-							await Settings.GetStorage<NewsMessage>(default, DataType.News).SaveAsync(news, token);
+							await Settings.GetStorage<NewsMessage>(default, DataType.News).SaveAsync(_unsavedNews, token);
+							_unsavedNews.Clear();
 						}
 
-						var boardStates = Buffer.GetBoardStates().ToArray();
+						Append(_unsavedBoardStates, Buffer.GetBoardStates(), DataType.BoardState);
 
-						if (boardStates.Length > 0)
+						if (_unsavedBoardStates.Count > 0)
 						{
-							await Settings.GetStorage<BoardStateMessage>(default, DataType.BoardState).SaveAsync(boardStates, token);
+							await Settings.GetStorage<BoardStateMessage>(default, DataType.BoardState).SaveAsync(_unsavedBoardStates, token);
+							_unsavedBoardStates.Clear();
 						}
 
-						await interval.Delay(token);
 					}
 					catch (Exception ex)
 					{
 						if (!token.IsCancellationRequested)
 							this.AddErrorLog(ex);
+					}
+
+					// Outside the try on purpose. The delay used to sit at the end of the
+					// cycle, so a cycle that threw skipped it and the loop spun at full
+					// speed for as long as storage kept failing.
+					try
+					{
+						await interval.Delay(token);
+					}
+					catch (OperationCanceledException)
+					{
+						break;
 					}
 				}
 			}, token);
@@ -470,19 +575,34 @@ public class BufferMessageAdapter(IMessageAdapter innerAdapter, StorageCoreSetti
 			{
 				cts.Cancel();
 			}
-			catch { }
+			catch (Exception ex)
+			{
+				this.AddErrorLog(ex);
+			}
 
 			try
 			{
+				// A cycle mid-save keeps running past this wait; the token it holds is
+				// already cancelled, so it unwinds on its own.
 				_storageTask?.Wait(TimeSpan.FromSeconds(1));
 			}
-			catch { }
+			catch (AggregateException ex) when (ex.InnerExceptions.All(e => e is OperationCanceledException))
+			{
+				// Expected: the cycle observed the cancellation.
+			}
+			catch (Exception ex)
+			{
+				this.AddErrorLog(ex);
+			}
 
 			try
 			{
 				cts.Dispose();
 			}
-			catch { }
+			catch (Exception ex)
+			{
+				this.AddErrorLog(ex);
+			}
 
 			_storageTask = null;
 		}

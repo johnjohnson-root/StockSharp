@@ -1,0 +1,54 @@
+# Encodes what this tree already does, measured rather than assumed.
+# An editor that honours this file leaves every existing file byte-identical;
+# anything the tree is not uniform about is deliberately left unset, and the
+# measurement that decided it is recorded beside the setting.
+#
+# Analyzer severities are absent on purpose. Setting one changes the build's
+# warning set, and the only honest way to add one is to compare the warning
+# count before and after on a real build. Add them a rule at a time, each with
+# that comparison in its commit body.
+
+root = true
+
+[*]
+# 1,636 of 1,637 tracked .cs files are LF in the index; the exception is
+# Algo/TraderHelper.cs, which is CRLF both in the index and the working tree.
+end_of_line = lf
+
+[*.cs]
+# 384 of a 400-file sample indent with tabs, and none indent with four
+# spaces.
+indent_style = tab
+indent_size = 4
+
+# charset and insert_final_newline stay unset for C#: the tree is split on
+# both, so either setting would rewrite hundreds of files on the next format.
+#   byte-order mark  533 files carry one, 931 do not
+#   final newline    789 files end with one, 675 do not
+# Settle each by sweeping the tree in its own commit, then set the value here.
+
+# The illi-voice-csharp rule that tooling can enforce: a documentation comment
+# binds to the declaration that follows it, so nothing may come between them.
+csharp_blank_lines_around_documentation_comment = false
+
+[*.{csproj,fsproj,props,targets,slnx,config,xml}]
+indent_style = space
+indent_size = 2
+
+[*.{yml,yaml}]
+indent_style = space
+indent_size = 2
+
+[*.json]
+indent_style = space
+indent_size = 2
+
+[*.sh]
+indent_style = tab
+indent_size = 4
+
+[*.md]
+indent_style = space
+indent_size = 2
+# Trailing whitespace is a line break in Markdown, so leave it alone.
+trim_trailing_whitespace = false

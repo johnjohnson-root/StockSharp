@@ -771,24 +771,44 @@ public class ConnectorRoutingTests : BaseTestClass
 		foreach (var secId in securities)
 			connector.Adapter.SecurityAdapterProvider.SetAdapter((secId, null), adapter);
 
-		var expected = securities.Length;
 		var online = new ConcurrentDictionary<long, bool>();
 		var stopped = new ConcurrentDictionary<long, bool>();
 		TaskCompletionSource<bool> onlineAll = null;
 		TaskCompletionSource<bool> stoppedAll = null;
 
+		// Each round waits for its own transaction ids rather than for a count.
+		// Counting let a late event from the previous round land after Clear() and
+		// stand in for one of this round's: the gate opened an event early, the
+		// round unsubscribed a subscription that had not reached Online yet, and
+		// UnSubscribeAll skips a subscription in that state - so its Stopped event
+		// never arrived and the next wait ran to the test timeout.
+		long[] roundOnlineIds = null;
+		long[] roundStoppedIds = null;
+
+		// Volatile because the round publishes the id set on the test thread and the
+		// handlers read it on the connector's.
+		void CheckOnline()
+		{
+			if (Volatile.Read(ref roundOnlineIds) is { } ids && ids.All(online.ContainsKey))
+				onlineAll?.TrySetResult(true);
+		}
+
+		void CheckStopped()
+		{
+			if (Volatile.Read(ref roundStoppedIds) is { } ids && ids.All(stopped.ContainsKey))
+				stoppedAll?.TrySetResult(true);
+		}
+
 		// Gate each round on actual subscription lifecycle events instead of timed delays.
 		connector.SubscriptionOnline += sub =>
 		{
 			online[sub.TransactionId] = true;
-			if (online.Count >= expected)
-				onlineAll?.TrySetResult(true);
+			CheckOnline();
 		};
 		connector.SubscriptionStopped += (sub, error) =>
 		{
 			stopped[sub.TransactionId] = true;
-			if (stopped.Count >= expected)
-				stoppedAll?.TrySetResult(true);
+			CheckStopped();
 		};
 
 		await connector.ConnectAsync(CancellationToken);
@@ -810,6 +830,8 @@ public class ConnectorRoutingTests : BaseTestClass
 		{
 			online.Clear();
 			stopped.Clear();
+			Volatile.Write(ref roundOnlineIds, null);
+			Volatile.Write(ref roundStoppedIds, null);
 			onlineAll = AsyncHelper.CreateTaskCompletionSource<bool>();
 			stoppedAll = AsyncHelper.CreateTaskCompletionSource<bool>();
 
@@ -824,6 +846,14 @@ public class ConnectorRoutingTests : BaseTestClass
 				totalSubscribes++;
 			}
 
+			// The connector assigns TransactionId inside Subscribe, so the round's id set
+			// is known only now. Publishing it and re-checking covers the events that
+			// arrived while the loop above was still running: the handler records every
+			// id unconditionally, so nothing that fired early is lost.
+			long[] ids = [.. subscriptions.Select(s => s.TransactionId)];
+			Volatile.Write(ref roundOnlineIds, ids);
+			CheckOnline();
+
 			// Wait until every subscription is online before unsubscribing.
 			await onlineAll.Task.WithCancellation(CancellationToken);
 
@@ -833,6 +863,9 @@ public class ConnectorRoutingTests : BaseTestClass
 				connector.UnSubscribe(sub);
 				totalUnsubscribes++;
 			}
+
+			Volatile.Write(ref roundStoppedIds, Volatile.Read(ref roundOnlineIds));
+			CheckStopped();
 
 			// Wait until every subscription is stopped before the next round.
 			await stoppedAll.Task.WithCancellation(CancellationToken);
@@ -1104,22 +1137,44 @@ public class ConnectorRoutingTests : BaseTestClass
 		var online = new ConcurrentDictionary<long, bool>();
 		var onlineAll = AsyncHelper.CreateTaskCompletionSource<bool>();
 
+		// The gate waits for these five transaction ids rather than for five events.
+		// Connect brings its own subscriptions up - the order-status lookup reaches
+		// Online too - so counting let one of those stand in for a tick subscription,
+		// opening the gate while one was still subscribing. Volatile because the ids
+		// are published on the test thread and read on the connector's.
+		long[] onlineIds = null;
+
+		void CheckOnline()
+		{
+			if (Volatile.Read(ref onlineIds) is { } ids && ids.All(online.ContainsKey))
+				onlineAll.TrySetResult(true);
+		}
+
 		// Gate the disconnect on every subscription actually going online instead of a timed delay.
 		// UnSubscribeAll only cleans subscriptions whose state is active, so a subscription that has
 		// not yet reached Online would be skipped and left uncleaned.
 		connector.SubscriptionOnline += sub =>
 		{
 			online[sub.TransactionId] = true;
-			if (online.Count >= expected)
-				onlineAll.TrySetResult(true);
+			CheckOnline();
 		};
 
 		// Create several subscriptions
+		var subscriptions = new List<Subscription>();
+
 		for (int i = 0; i < expected; i++)
 		{
 			var sub = new Subscription(DataType.Ticks, btcSecurity);
+			subscriptions.Add(sub);
 			connector.Subscribe(sub);
 		}
+
+		// TransactionId is assigned inside Subscribe, so the id set is known only here;
+		// the handler records every id unconditionally, so an event that arrived during
+		// the loop above is still counted by this re-check.
+		long[] subIds = [.. subscriptions.Select(s => s.TransactionId)];
+		Volatile.Write(ref onlineIds, subIds);
+		CheckOnline();
 
 		// Wait until every subscription is online before disconnecting. Identical (Ticks, BTCUSDT)
 		// subscriptions are deduplicated by the connector's online manager into a single underlying
