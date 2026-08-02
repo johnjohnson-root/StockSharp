@@ -52,8 +52,9 @@ A new consequential choice takes the next number in the sequence.
 ### T1. Ecng surface inventory — done 2026-08-02
 
 `docs/ecng-surface.md` measures the closure from IL metadata:
-28 packages, 279 consumed types, 968 consumed members,
+28 packages as measured, 279 consumed types, 968 consumed members,
 ranked in four replacement waves.
+The wave 1 rank 1 pass has since taken the closure to 27.
 Waves 1–2 clear 13 packages for roughly 25 members of implementation;
 the first target, `Ecng.Compilation.All` (zero members), is done,
 which leaves `Ecng.Interop` and `Ecng.Net` (one member each) next.
@@ -447,59 +448,60 @@ sequential number, Status field, forcing-condition Context,
 A future decision continues the numbering;
 supersession adds a record and leaves the old one standing.
 
-### T17. Write CONTRIBUTING.md
+### T17. CONTRIBUTING.md — done 2026-08-02
 
-Blocked by: nothing.
+One page in lifecycle order:
+what the fork is, build and test, prose, commits and pull requests,
+decisions, license.
+The build section carries the standard gate verbatim
+and says what a green run reports,
+including why 11 tests skip and why the Python filter is there,
+so a newcomer reaches a green gate from this file alone.
 
-One page, lifecycle order:
+Two conventions are written down for the first time:
+a regression test earns its place by failing on the unfixed code,
+and the commit body says so and what the failure looked like;
+a comment-only change carries a code-identity check.
+The decisions section states the record format
+and names `0006` as the one most changes touch.
 
-1. Definition: what this fork is (one paragraph; `README.md`'s fork
-   section is the source).
-2. Build and test: the two commands from the standard gate.
-3. Prose rules: point at `.claude/skills/` — voice for wording,
-   format-sweep for line breaks, the variants for C# and CJK.
-4. Commit and PR shape: the illi-voice commit rules,
-   plus the fork's proof conventions
-   (regression tests demonstrate they bite; comment-only changes carry
-   a code-identity check).
-5. The decision-record process (T16) for anything consequential.
+### T18. CHANGELOG.md — done 2026-08-02
 
-Verify: a newcomer reaches a green standard gate following only this
-file; every referenced path exists.
+Seeded from the fork's shipped work,
+written from what a consumer observes rather than from what the commits
+touched, under Added / Changed / Fixed / Security headings.
+Everything sits in `Unreleased`,
+because record 0004 keeps packages as CI artifacts until a feed exists.
 
-### T18. Seed CHANGELOG.md
+The compare link resolves against `22ca8fb`,
+upstream's last Apache-2.0 commit and this fork's declared base,
+because the repository carries no tags yet.
+Cutting a release means adding a version heading above `Unreleased`
+and pointing a new compare link at the tag (T5).
 
-Blocked by: nothing (T5 consumes it later).
+### T19. .editorconfig — done 2026-08-02, two sweeps deferred
 
-1. Follow the illi-voice changelog rules:
-   observable behavior first, kind labels
-   (Added/Changed/Fixed/Security), ISO dates, newest first,
-   bracketed versions as compare links.
-2. Seed an Unreleased section from the fork's shipped work:
-   the license preservation, the standalone build, the Foundation
-   collections, the async migration, the optimizer hardening,
-   pin/mirror, packaging, and the prose sweep —
-   `git log --oneline master` is the source; write what a consumer
-   observes, one line each.
+Encodes what the tree measurably does:
+tabs in `.cs` (384 of a 400-file sample, none at four spaces),
+LF everywhere (1,636 of 1,637 tracked `.cs` files;
+`Algo/TraderHelper.cs` is the one CRLF file),
+two-space indent for the XML, YAML, JSON and Markdown families,
+tabs in shell scripts,
+and the `illi-voice-csharp` doc-comment adjacency rule.
 
-Verify: every entry names observable behavior, none names only a
-commit; dates ISO; compare links resolve.
+Two settings the item asked for are deliberately unset,
+because the tree is not uniform about either
+and setting one would rewrite hundreds of files on the next format —
+which the item's own verification forbids:
 
-### T19. Add .editorconfig
+    byte-order mark   533 .cs files carry one, 931 do not
+    final newline     789 .cs files end with one, 675 do not
 
-Blocked by: nothing.
-
-1. Encode what the tree already does — tabs in `.cs` (match the
-   existing files), UTF-8, LF, final newline —
-   plus the doc-comment adjacency the `illi-voice-csharp` variant
-   states (no blank line between `///` and member).
-2. Add the analyzer severities only where the codebase is already
-   clean; introduce no new warnings
-   (the build's warning set is the regression surface —
-   compare before/after).
-
-Verify: `dotnet build` warning count unchanged; `git diff` after an
-IDE format of one untouched file is empty.
+Each is a tree-wide sweep in its own commit,
+after which the value belongs in `.editorconfig`.
+No analyzer severities: adding one changes the build's warning set,
+and the honest way to add it is to compare warning counts across a real
+build, a rule at a time.
 
 ### T20. Optional: sweep the upstream C# comment surface
 
