@@ -55,8 +55,8 @@ A new consequential choice takes the next number in the sequence.
 28 packages, 279 consumed types, 968 consumed members,
 ranked in four replacement waves.
 Waves 1–2 clear 13 packages for roughly 25 members of implementation;
-the first targets are `Ecng.Compilation.All` (zero members),
-then `Ecng.Interop` and `Ecng.Net` (one member each).
+the first target, `Ecng.Compilation.All` (zero members), is done,
+which leaves `Ecng.Interop` and `Ecng.Net` (one member each) next.
 The load-bearing finding: 86 Ecng types sit in the fork's own public
 surface across 14 packages,
 so replacing those carries a type-forwarding shim
@@ -69,6 +69,9 @@ The method section lists the measurement's blind spots
 
 Blocked by: T1's ranking. Repeatable; one surface per pass.
 Decision record 0003 sets the method.
+Wave 1 rank 1 (`Ecng.Compilation.All`) is done —
+see the inventory's `Completed passes` section;
+the closure is 27 packages and the pin list 20 ids.
 
 Follow the Foundation pattern end to end:
 

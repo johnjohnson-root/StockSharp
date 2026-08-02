@@ -10,7 +10,8 @@
   -->
   <ItemGroup>
     <PackageReference Update="Ecng.Compilation" Version="1.0.319" />
-    <PackageReference Update="Ecng.Compilation.All" Version="1.0.70" />
+    <PackageReference Update="Ecng.Compilation.FSharp" Version="1.0.207" />
+    <PackageReference Update="Ecng.Compilation.Python" Version="1.0.213" />
     <PackageReference Update="Ecng.Compilation.Roslyn" Version="1.0.317" />
     <PackageReference Update="Ecng.ComponentModel" Version="1.0.454" />
     <PackageReference Update="Ecng.Configuration" Version="1.0.267" />

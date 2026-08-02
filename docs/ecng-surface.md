@@ -12,6 +12,8 @@ Decision record `0003` orders the clean-room replacement from this data,
 and TODO item `T2` consumes the ranking at the end.
 
 Measured 2026-08-02 against the working tree at that date.
+The `Completed passes` section below records each replacement since,
+and the counts throughout carry those passes.
 
 ## What the numbers mean
 
@@ -32,7 +34,7 @@ because no consumer of `StockSharp.*` can observe the change.
 A package with public exposure reaches the drop-in contract that decision record `0006` holds through 1.x,
 so its replacement carries either a type-forwarding shim or a `for 2.0` decision record.
 
-Totals across the whole closure: **28 packages, 279 distinct types, 968 distinct members.**
+Totals across the whole closure: **27 packages, 279 distinct types, 968 distinct members.**
 
 ## Method
 
@@ -78,10 +80,10 @@ each project writes `Version="$(EcngVer)"`,
 and `Directory.Build.targets` overrides every one with an exact version through `PackageReference Update`.
 `common_target_tests.props` adds `Ecng.UnitTesting` to every test project.
 
-Nineteen `Ecng.*` ids carry a pin.
-Nine more arrive transitively and land in the restore closure all the same,
-which makes 28 packages the fork must own before the layer is its own.
-The offline mirror in `nuget-mirror/` holds 27 of them;
+Twenty `Ecng.*` ids carry a pin.
+Seven more arrive transitively and land in the restore closure all the same,
+which makes 27 packages the fork must own before the layer is its own.
+The offline mirror in `nuget-mirror/` holds 26 of them;
 `Ecng.Interop` is absent because its only consumer is a sample,
 and samples sit outside both solutions.
 
@@ -90,9 +92,8 @@ and samples sit outside both solutions.
 | Ecng.Collections | 1.0.298 | transitive | 36 | 205 | heavy | 19 |
 | Ecng.Common | 1.0.261 | transitive | 53 | 258 | heavy | 24 |
 | Ecng.Compilation | 1.0.319 | pinned | 15 | 31 | moderate | 6 |
-| Ecng.Compilation.All | 1.0.70 | pinned | 0 | 0 | trivial | 0 |
-| Ecng.Compilation.FSharp | 1.0.207 | transitive | 1 | 1 | trivial | 1 |
-| Ecng.Compilation.Python | 1.0.213 | transitive | 2 | 2 | trivial | 1 |
+| Ecng.Compilation.FSharp | 1.0.207 | pinned | 1 | 1 | trivial | 1 |
+| Ecng.Compilation.Python | 1.0.213 | pinned | 2 | 2 | trivial | 1 |
 | Ecng.Compilation.Roslyn | 1.0.317 | pinned | 2 | 2 | trivial | 3 |
 | Ecng.ComponentModel | 1.0.454 | pinned | 73 | 152 | heavy | 16 |
 | Ecng.Configuration | 1.0.267 | pinned | 1 | 4 | trivial | 10 |
@@ -129,24 +130,9 @@ which is a data-licensing question rather than an engineering one.
 
 Sections run smallest consumed surface first within each size class.
 
-### Ecng.Compilation.All
-
-Version 1.0.70, pinned directly.
-Ships `Ecng.Compilation.All.dll` with zero public types,
-and no fork assembly references it.
-Size class: trivial.
-Referencing projects: `Algo.Compilation` names the package in its csproj and binds nothing from it.
-Ecng-internal dependencies: `Ecng.Compilation`, `.FSharp`, `.Python`, `.Roslyn`, by nuspec alone.
-Ecng-internal dependents: none.
-Public exposure: none.
-
-The package is a meta-package whose whole job is pulling the three compiler backends.
-`Algo.Compilation` constructs `CSharpCompiler`, `VisualBasicCompiler`, `FSharpCompiler`, and `PythonCompiler` directly,
-so replacing the reference with those three package ids drops this pin without a line of new code.
-
 ### Ecng.Compilation.FSharp
 
-Version 1.0.207, transitive through `Ecng.Compilation.All`.
+Version 1.0.207, pinned directly since the wave 1 rank 1 pass.
 Ships `Ecng.Compilation.FSharp.dll`; the fork binds 1 of its 1 public type and 1 of its 1 public member.
 Size class: trivial.
 Referencing projects: `Algo.Compilation`.
@@ -271,7 +257,7 @@ One predicate at `Algo/Storages/DriveCache.cs` holds a 165-member package in the
 
 ### Ecng.Compilation.Python
 
-Version 1.0.213, transitive through `Ecng.Compilation.All`.
+Version 1.0.213, pinned directly since the wave 1 rank 1 pass.
 Ships `Ecng.Compilation.Python.dll`; the fork binds 2 of its 2 public types and 2 of its 16 public members.
 Size class: trivial.
 Referencing projects: `Algo.Compilation`.
@@ -907,7 +893,6 @@ because a pin falls only when no retained package still needs it.
     Ecng.Collections            Common
     Ecng.Common                 (none)
     Ecng.Compilation            Collections, Common, IO, Security, Serialization
-    Ecng.Compilation.All        (none in IL; nuspec names Compilation, FSharp, Python, Roslyn)
     Ecng.Compilation.FSharp     Collections, Common, Compilation, Security
     Ecng.Compilation.Python     Collections, Common, Compilation, ComponentModel, Reflection
     Ecng.Compilation.Roslyn     Common, Compilation, Localization
@@ -947,7 +932,7 @@ Counted the other way, the packages that hold others in place:
     Ecng.Data               2
     Ecng.Excel              1
 
-The other 17 packages have zero Ecng dependents,
+The other 16 packages have zero Ecng dependents,
 which makes them the replaceable leaves.
 
 ## Replacement order
@@ -964,7 +949,7 @@ Three criteria order the work, applied in this sequence:
 
 | rank | package | members | class | consumers |
 | --- | --- | --- | --- | --- |
-| 1 | Ecng.Compilation.All | 0 | trivial | `Algo.Compilation` csproj only |
+| 1 | Ecng.Compilation.All | 0 | trivial | done, see `Completed passes` |
 | 2 | Ecng.Interop | 1 | trivial | one sample |
 | 3 | Ecng.Net | 1 | trivial | `Algo` |
 | 4 | Ecng.Linq | 2 | trivial | 4 projects |
@@ -972,12 +957,6 @@ Three criteria order the work, applied in this sequence:
 | 6 | Ecng.Configuration | 4 | trivial | 10 projects |
 | 7 | Ecng.StringSearch | 6 | trivial | `Algo` |
 
-Rank 1 writes no code:
-point `Algo.Compilation` at `Ecng.Compilation.Roslyn`, `.FSharp`, and `.Python` directly
-and the meta-package pin drops.
-The trade is two new pins,
-because `Ecng.Compilation.FSharp` and `Ecng.Compilation.Python` arrive transitively today,
-so the pin count moves from 19 to 20 and the package count in the closure falls by one.
 Ranks 2 through 5 are single-function ports with contract tests measured in tens of lines.
 Rank 6 carries a wide migration behind a four-member contract,
 and rank 7 replaces a Patricia trie whose behavior `Algo/SecurityTrie.cs` pins exactly.
@@ -1020,7 +999,7 @@ or queue the break as a `for 2.0` record.
 | --- | --- | --- | --- | --- |
 | 18 | Ecng.Data | 10 | trivial | ranks 8, 9 |
 | 19 | Ecng.Excel | 19 | trivial | rank 13 |
-| 20 | Ecng.Compilation | 31 | moderate | ranks 1, 10, 11, 12 |
+| 20 | Ecng.Compilation | 31 | moderate | ranks 10, 11, 12 |
 | 21 | Ecng.ComponentModel | 152 | heavy | ranks 3, 11, 17, 18 |
 | 22 | Ecng.Localization | 1 | trivial | ranks 3, 12, 14, 17, 21 |
 | 23 | Ecng.Serialization | 53 | moderate | ranks 16, 18, 20, 21 |
@@ -1040,13 +1019,33 @@ and it is the shape the work will probably want by then.
 ### Reading the ranking
 
 Waves 1 and 2 clear 13 of the 28 packages for 25 members of implementation,
-and the pin list in `Directory.Build.targets` falls from 19 Ecng ids to 8 —
+and the pin list in `Directory.Build.targets` falls to 8 —
 `Ecng.Compilation`, `Ecng.ComponentModel`, `Ecng.Data`, `Ecng.Drawing`,
 `Ecng.Excel`, `Ecng.GeneticSharp`, `Ecng.Logging`, and `Ecng.UnitTesting`.
 That is the whole leaves-first argument in one line.
 Wave 3 costs 138 members and one contract decision.
 Wave 4 holds 805 of the 968 measured members, 83 percent of the total,
 and `Ecng.Common`, `Ecng.Collections`, and `Ecng.ComponentModel` alone are 615 of them.
+
+## Completed passes
+
+### Wave 1 rank 1 — Ecng.Compilation.All, dropped 2026-08-02
+
+The meta-package declared four dependencies and shipped zero public types,
+and no fork assembly held a reference to it:
+`Algo.Compilation` already imported `Ecng.Compilation.FSharp`, `.Python`, and `.Roslyn`
+and constructed `CSharpCompiler`, `VisualBasicCompiler`, `FSharpCompiler`, and `PythonCompiler` by name.
+Naming those three packages in the csproj instead of the meta-package
+left every binding in the tree unchanged
+and removed the pin.
+
+The pass wrote no code and needed no contract tests,
+because a package with zero consumed members has no behavior to hold.
+It cost two new pins:
+`Ecng.Compilation.FSharp` and `Ecng.Compilation.Python` arrived transitively before
+and are direct references now,
+so the pin count moved from 19 to 20
+while the closure fell from 28 packages to 27.
 
 ## What the Foundation collections already replaced
 
