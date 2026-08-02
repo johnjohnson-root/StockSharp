@@ -197,7 +197,10 @@ Documentation.shfbproj_Ivan
 
 .vs/
 
-.claude
+# Project skills are committed; the rest of .claude stays local
+# (settings, caches, per-user state).
+.claude/*
+!.claude/skills/
 CLAUDE.md
 AGENTS.md
 /reviewResults
