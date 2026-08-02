@@ -2,12 +2,16 @@
 
 ## Overview
 
-StockSharp.Algo is the core algorithmic trading library used throughout the StockSharp platform. It provides the building blocks for creating trading bots, managing market data, handling order routing, and simulating strategies against historical data. The library targets **.NET 6.0** and can be used in desktop, server, or cloud applications.
+StockSharp.Algo is the core algorithmic trading library used throughout the StockSharp platform.
+It provides the building blocks for creating trading bots, managing market data, handling order routing, and simulating strategies against historical data.
+The library targets **.NET 6.0** and can be used in desktop, server, or cloud applications.
 
 ## Features
 
-- **Connectors and Message Adapters** – unified infrastructure for connecting to exchanges and data feeds. Includes offline adapters for simulation and adapters for incremental order books, snapshots, and extended order information.
-- **Strategy Framework** – base classes for building algorithmic strategies with built‑in event model, parameter system, and rule management. Strategies can be composed and executed in parallel or as baskets.
+- **Connectors and Message Adapters** – unified infrastructure for connecting to exchanges and data feeds.
+  Includes offline adapters for simulation and adapters for incremental order books, snapshots, and extended order information.
+- **Strategy Framework** – base classes for building algorithmic strategies with built‑in event model, parameter system, and rule management.
+  Strategies can be composed and executed in parallel or as baskets.
 - **Market Data Storages** – tools for storing quotes, trades, candles, and order books in various formats (binary, CSV) with caching and synchronization support.
 - **Risk and PnL** – modules for risk management, slippage modeling, commission calculation, and real‑time profit‑and‑loss tracking.
 - **Testing and Emulation** – historical emulation connectors and market data generators for backtesting strategies under conditions close to real trading.

@@ -2,7 +2,13 @@
 
 ## Overview
 
-This strategy is designed to capitalize on the momentum within each trading candle. If a candle closes higher than it opens, suggesting an upward trend, the strategy generates a buy order if the current position is not already long. Conversely, if a candle closes lower than it opens, indicating a downward trend, the strategy issues a sell order if the current position is not already short.
+This strategy is designed to capitalize on the momentum within each trading candle.
+If a candle closes higher than it opens,
+suggesting an upward trend,
+the strategy generates a buy order if the current position is not already long.
+Conversely, if a candle closes lower than it opens,
+indicating a downward trend,
+the strategy issues a sell order if the current position is not already short.
 
 ## Key Components
 
@@ -44,7 +50,8 @@ This helps platforms like Designer properly initialize the required market data.
 
 ### Strategy Start
 
-When the strategy starts, it sets up data subscriptions and visualization components:
+When the strategy starts,
+it sets up data subscriptions and visualization components:
 
 ```csharp
 protected override void OnStarted2(DateTime time)
@@ -73,7 +80,8 @@ protected override void OnStarted2(DateTime time)
 
 ### Candle Processing Logic
 
-This is the core of the strategy, where candle data is analyzed and trading orders are generated based on the direction of the candle:
+This is the core of the strategy,
+where candle data is analyzed and trading orders are generated based on the direction of the candle:
 
 ```csharp
 private void ProcessCandle(ICandleMessage candle)
@@ -103,22 +111,28 @@ private void ProcessCandle(ICandleMessage candle)
 - **Candle Completion Check**: Ensures that the strategy only processes candles that have completed their formation.
 - **Strategy Readiness Check**: Uses the combined check `IsFormedAndOnlineAndAllowTrading()` to ensure the strategy is in a proper state for trading (indicators formed, online data feed active, and trading allowed).
 - **Trading Decisions**:
-  - **Buy Condition**: If the candle closes higher than it opens (bullish) and the current position is not long (neutral or short), the strategy buys. This follows the momentum of the upward movement.
-  - **Sell Condition**: If the candle closes lower than it opens (bearish) and the current position is not short (neutral or long), the strategy sells, following the downward momentum.
-- **Position Scaling**: When entering a position, the strategy adjusts the order volume to include any existing position.
+  - **Buy Condition**: If the candle closes higher than it opens (bullish) and the current position is not long (neutral or short), the strategy buys.
+    This follows the momentum of the upward movement.
+  - **Sell Condition**: If the candle closes lower than it opens (bearish) and the current position is not short (neutral or long), the strategy sells,
+    following the downward momentum.
+- **Position Scaling**: When entering a position,
+  the strategy adjusts the order volume to include any existing position.
 
 ### Trading Operations
 
 The strategy uses high-level trading operation methods for order execution:
 
-- **BuyMarket**: Issues a market order to buy the specified volume, handling order creation and registration automatically.
+- **BuyMarket**: Issues a market order to buy the specified volume,
+  handling order creation and registration automatically.
 - **SellMarket**: Issues a market order to sell the specified volume, with the same automatic handling.
 
 These methods simplify the trading code by combining order creation and registration into a single call.
 
 ## Conclusion
 
-The `OneCandleTrend` strategy exemplifies a simple yet effective approach to trend following in financial markets, using candlestick data to inform trading decisions. It relies on the basic premise that the direction in which a candle closes relative to its opening may indicate the immediate future direction of the market.
+The `OneCandleTrend` strategy exemplifies a simple yet effective approach to trend following in financial markets,
+using candlestick data to inform trading decisions.
+It relies on the basic premise that the direction in which a candle closes relative to its opening may indicate the immediate future direction of the market.
 
 Key advantages of this implementation include:
 - Clean, concise code using StockSharp's high-level APIs

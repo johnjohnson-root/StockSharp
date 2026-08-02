@@ -2,7 +2,8 @@
 
 ## Overview
 
-This documentation section explains how to handle and visualize real-time candle data using the StockSharp trading framework within a .NET application. The functionalities include setting up candle subscriptions based on various criteria and displaying the candle data in a chart.
+This documentation section explains how to handle and visualize real-time candle data using the StockSharp trading framework within a .NET application.
+The functionalities include setting up candle subscriptions based on various criteria and displaying the candle data in a chart.
 
 ## Key Components
 
@@ -81,6 +82,9 @@ private void Connector_CandleSeriesProcessing(Subscription subscription, Candle 
 
 ## Conclusion
 
-This setup enables the application to handle real-time candle data for selected securities, offering capabilities to dynamically subscribe to different types of candles and visualize them using integrated chart components. This guide provides clear instructions on how to set up and manage candle data within the application, facilitating the development of advanced trading strategies based on real-time data analysis.
+This setup enables the application to handle real-time candle data for selected securities,
+offering capabilities to dynamically subscribe to different types of candles and visualize them using integrated chart components.
+This guide provides clear instructions on how to set up and manage candle data within the application,
+facilitating the development of advanced trading strategies based on real-time data analysis.
 
 Feel free to adjust the snippets and explanations to better fit the actual implementation details or specific configurations in your project.

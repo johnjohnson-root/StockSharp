@@ -5,8 +5,9 @@ namespace StockSharp.Foundation.Collections;
 /// </summary>
 /// <remarks>
 /// <see cref="Add"/> returns <see langword="void"/> and silently ignores a duplicate,
-/// matching <see cref="ICollection{T}"/>; use <see cref="TryAdd"/> when the caller needs
-/// to know whether the item was new. Enumeration hands back a snapshot.
+/// matching <see cref="ICollection{T}"/>;
+/// use <see cref="TryAdd"/> when the caller needs to know whether the item was new.
+/// Enumeration hands back a snapshot.
 /// </remarks>
 /// <typeparam name="T">Item type.</typeparam>
 public class SynchronizedSet<T> : ICollection<T>, ISynchronized
@@ -37,7 +38,7 @@ public class SynchronizedSet<T> : ICollection<T>, ISynchronized
 	protected HashSet<T> Inner => _inner;
 
 	/// <summary>
-	/// Take <see cref="SyncRoot"/> for the duration of the returned scope.
+	/// Takes <see cref="SyncRoot"/> for the duration of the returned scope.
 	/// </summary>
 	/// <returns>Lock scope.</returns>
 	public Lock.Scope EnterScope() => SyncRoot.EnterScope();
@@ -66,7 +67,7 @@ public class SynchronizedSet<T> : ICollection<T>, ISynchronized
 	public void Add(T item) => TryAdd(item);
 
 	/// <summary>
-	/// Add the item, reporting whether it was not already present.
+	/// Adds the item, reporting whether it was absent before the call.
 	/// </summary>
 	/// <param name="item">Item.</param>
 	/// <returns><see langword="true"/> if the item was added.</returns>
@@ -139,6 +140,11 @@ public class SynchronizedSet<T> : ICollection<T>, ISynchronized
 /// <summary>
 /// <see cref="SynchronizedSet{T}"/> that also exposes a cached snapshot array.
 /// </summary>
+/// <remarks>
+/// A snapshot already handed out is never mutated:
+/// a change to the set discards the cached array,
+/// and the next access builds a fresh one.
+/// </remarks>
 /// <typeparam name="T">Item type.</typeparam>
 public class CachedSynchronizedSet<T> : SynchronizedSet<T>
 {

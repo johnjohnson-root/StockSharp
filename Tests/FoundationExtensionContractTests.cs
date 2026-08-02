@@ -3,10 +3,13 @@ namespace StockSharp.Tests;
 using StockSharp.Foundation.Collections;
 
 /// <summary>
-/// Contract for the synchronized-collection helper extensions
-/// (<see cref="SynchronizedExtensions"/>). These pin the semantics reconstructed from the
-/// codebase's call sites so a later drop of the previous provider cannot change behaviour.
+/// Pins the contract of the synchronized-collection helper extensions
+/// in <see cref="SynchronizedExtensions"/>.
 /// </summary>
+/// <remarks>
+/// The semantics are reconstructed from this codebase's call sites, not from the previous
+/// provider's source, so these tests are the authority a replacement implementation must satisfy.
+/// </remarks>
 [TestClass]
 public class FoundationExtensionContractTests : BaseTestClass
 {
@@ -193,8 +196,8 @@ public class FoundationExtensionContractTests : BaseTestClass
 	{
 		var set = new CachedSynchronizedSet<int> { 1, 2, 3 };
 
-		// the codebase pattern SyncGet(c => c.CopyAndClear()) — the inner helper re-enters
-		// the same lock; this must not deadlock and must be atomic
+		// the codebase pattern SyncGet(c => c.CopyAndClear()): the inner helper re-enters the
+		// same lock, which must neither deadlock nor break atomicity
 		var drained = set.SyncGet(c => c.CopyAndClear());
 
 		drained.Length.AssertEqual(3);
@@ -220,9 +223,8 @@ public class FoundationExtensionContractTests : BaseTestClass
 		for (var i = 0; i < 100; i++)
 			set.Add(i);
 
-		// an observer sampling Count during the swap must never see the intermediate
-		// (emptied) state, because SyncDo holds the lock across both operations and Count
-		// takes the same lock
+		// an observer sampling Count during a swap must never see the intermediate (emptied)
+		// state: SyncDo holds the lock across both operations, and Count takes the same lock
 		var observer = Task.Run(() =>
 		{
 			for (var i = 0; i < 2000; i++)

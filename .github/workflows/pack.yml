@@ -1,9 +1,10 @@
 name: Pack
 
-# Builds the fork-branded NuGet packages (SSharp.* by default, see
-# common_packaging.props) and uploads them as a CI artifact. Publishing to a
-# feed stays a deliberate, manual step: download the artifact and push with
-# `dotnet nuget push`.
+# Builds the fork-branded NuGet packages
+# (StockShark.* by default, see common_packaging.props)
+# and uploads them as a CI artifact.
+# Publishing to a feed stays a deliberate, manual step:
+# download the artifact and push it with `dotnet nuget push`.
 
 on:
   workflow_dispatch:
@@ -30,9 +31,13 @@ jobs:
             10.0.x
 
       - name: Pack
+        # The input reaches the script through env,
+        # so the shell reads a crafted "version" value as data alone.
+        env:
+          FORK_PACKAGE_VERSION: ${{ github.event.inputs.version }}
         run: |
-          if [ -n "${{ github.event.inputs.version }}" ]; then
-            export PACK_ARGS="-p:ForkPackageVersion=${{ github.event.inputs.version }}"
+          if [ -n "$FORK_PACKAGE_VERSION" ]; then
+            export PACK_ARGS="-p:ForkPackageVersion=$FORK_PACKAGE_VERSION"
           fi
           ./tools/pack.sh
 

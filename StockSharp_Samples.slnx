@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/03_Storage/">
+    <Project Path="Samples/03_Storage/01_Random/01_Storage.Random.csproj" />
+    <Project Path="Samples/03_Storage/02_Local/02_Storage.Local.csproj" />
+  </Folder>
+  <Folder Name="/07_Testing/">
+    <Project Path="Samples/07_Testing/04_HistoryConsole/04_Testing.HistoryConsole.csproj" />
+  </Folder>
+  <Folder Name="/08_Misc/">
+    <Project Path="Samples/08_Misc/02_Unit/02_Misc.Unit.csproj" />
+  </Folder>
+</Solution>

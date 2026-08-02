@@ -4,8 +4,9 @@ namespace StockSharp.Foundation.Collections;
 /// Thread-safe <see cref="IList{T}"/>.
 /// </summary>
 /// <remarks>
-/// Every member takes <see cref="SyncRoot"/>; enumeration hands back a snapshot so a
-/// caller can enumerate while another thread mutates.
+/// Every member takes <see cref="SyncRoot"/>;
+/// enumeration hands back a snapshot,
+/// so a caller can enumerate while another thread mutates.
 /// </remarks>
 /// <typeparam name="T">Item type.</typeparam>
 public class SynchronizedList<T> : IList<T>, ISynchronized
@@ -36,7 +37,7 @@ public class SynchronizedList<T> : IList<T>, ISynchronized
 	protected List<T> Inner => _inner;
 
 	/// <summary>
-	/// Take <see cref="SyncRoot"/> for the duration of the returned scope.
+	/// Takes <see cref="SyncRoot"/> for the duration of the returned scope.
 	/// </summary>
 	/// <returns>Lock scope.</returns>
 	public Lock.Scope EnterScope() => SyncRoot.EnterScope();
@@ -173,6 +174,11 @@ public class SynchronizedList<T> : IList<T>, ISynchronized
 /// <summary>
 /// <see cref="SynchronizedList{T}"/> that also exposes a cached snapshot array.
 /// </summary>
+/// <remarks>
+/// A snapshot already handed out is never mutated:
+/// a change to the list discards the cached array,
+/// and the next access builds a fresh one.
+/// </remarks>
 /// <typeparam name="T">Item type.</typeparam>
 public class CachedSynchronizedList<T> : SynchronizedList<T>
 {

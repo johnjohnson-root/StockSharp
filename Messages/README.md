@@ -1,6 +1,7 @@
 # StockSharp Messages Library
 
-The **Messages** project contains the essential message definitions shared across the StockSharp (S#) trading framework. Messages are the contracts used by connectors, adapters and other services for all interactions such as connecting to brokers, requesting market data or placing orders.
+The **Messages** project contains the essential message definitions shared across the StockSharp (S#) trading framework.
+Messages are the contracts used by connectors, adapters and other services for all interactions such as connecting to brokers, requesting market data or placing orders.
 
 ## Overview
 
@@ -42,7 +43,8 @@ var mdMessage = new MarketDataMessage
 };
 ```
 
-Such messages are passed to an adapter, which forwards them to the broker or data provider.
+Such messages are passed to an adapter,
+which forwards them to the broker or data provider.
 
 ## Documentation
 

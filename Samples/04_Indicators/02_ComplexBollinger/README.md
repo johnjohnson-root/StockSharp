@@ -2,7 +2,8 @@
 
 ## Overview
 
-The `MainWindow` class in the WPF application demonstrates how to set up a chart to display financial data (candles) along with a Bollinger Bands indicator, which is commonly used in trading to identify the volatility and price levels over a standard deviation measurement.
+The `MainWindow` class in the WPF application demonstrates how to set up a chart to display financial data (candles) along with a Bollinger Bands indicator,
+which is commonly used in trading to identify the volatility and price levels over a standard deviation measurement.
 
 ## Key Components and Functionalities
 
@@ -31,7 +32,8 @@ public MainWindow()
 ```
 - **Chart Area**: Defines the visual area where data will be plotted.
 - **Candle Element**: Sets up candles to be drawn on the chart.
-- **Indicator Element**: Configures how the Bollinger Bands will be displayed, using a specific `IndicatorPainter` designed for this purpose.
+- **Indicator Element**: Configures how the Bollinger Bands will be displayed,
+  using a specific `IndicatorPainter` designed for this purpose.
 
 ### Data Loading and Indicator Calculation
 
@@ -59,8 +61,13 @@ foreach (var candle in candles)
 ```
 - **Candle Storage**: Fetches one-minute candles for the security "SBER@TQBR" using the local storage path.
 - **Bollinger Bands Calculation**: The `BollingerBands` indicator is updated with each candle.
-- **Drawing on Chart**: Groups data by the opening time of the candle and adds both the candle and the computed indicator value to the chart for visualization.
+- **Drawing on Chart**: Groups data by the opening time of the candle
+  and adds both the candle and the computed indicator value to the chart for visualization.
 
 ## Conclusion
 
-This implementation effectively demonstrates how to use StockSharp's charting capabilities to visualize financial data along with technical indicators, specifically focusing on Bollinger Bands. The application allows traders or analysts to visually interpret volatility and price levels relative to the moving average, aiding in trading decisions based on historical data. Adjustments can be made to the Bollinger Bands parameters or the visual styling to better suit specific analytical needs or preferences.
+This implementation effectively demonstrates how to use StockSharp's charting capabilities to visualize financial data along with technical indicators,
+specifically focusing on Bollinger Bands.
+The application allows traders or analysts to visually interpret volatility and price levels relative to the moving average,
+aiding in trading decisions based on historical data.
+Adjustments can be made to the Bollinger Bands parameters or the visual styling to better suit specific analytical needs or preferences.

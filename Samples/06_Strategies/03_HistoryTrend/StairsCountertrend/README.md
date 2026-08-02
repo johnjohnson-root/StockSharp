@@ -2,7 +2,10 @@
 
 ## Overview
 
-This strategy operates on the principle of identifying sequences of consecutive bullish or bearish candles. A "stair" is defined as a series of candles moving consistently in one direction (up for bullish, down for bearish). The strategy initiates trades in the opposite direction when these sequences reach a predetermined length, hypothesizing a potential reversal or pullback.
+This strategy operates on the principle of identifying sequences of consecutive bullish or bearish candles.
+A "stair" is defined as a series of candles moving consistently in one direction (up for bullish, down for bearish).
+The strategy initiates trades in the opposite direction when these sequences reach a predetermined length,
+hypothesizing a potential reversal or pullback.
 
 ## Key Components
 
@@ -58,7 +61,8 @@ This enables platforms like Designer to correctly initialize the required data s
 
 ### Strategy Initialization
 
-When the strategy starts, it initializes counters and sets up subscriptions:
+When the strategy starts,
+it initializes counters and sets up subscriptions:
 
 ```csharp
 protected override void OnStarted2(DateTime time)
@@ -148,13 +152,16 @@ private void ProcessCandle(ICandleMessage candle)
 The strategy's countertrend approach is based on the following principles:
 
 1. **Pattern Recognition**: The strategy identifies trends by counting consecutive candles moving in the same direction.
-2. **Mean Reversion Philosophy**: It assumes that after a certain number of movements in one direction, the price is more likely to revert.
-3. **Adaptive Sensitivity**: The `Length` parameter determines how sensitive the strategy is to trend changes, with higher values requiring stronger trends before triggering a countertrend trade.
+2. **Mean Reversion Philosophy**: It assumes that after a certain number of movements in one direction,
+   the price is more likely to revert.
+3. **Adaptive Sensitivity**: The `Length` parameter determines how sensitive the strategy is to trend changes,
+   with higher values requiring stronger trends before triggering a countertrend trade.
 4. **Position Management**: The strategy can both enter new positions and add to existing ones when signals align with the current position.
 
 ## Conclusion
 
-The `StairsCountertrend` strategy is an implementation of a countertrend trading approach that seeks to profit from potential price reversals after consistent directional moves. Its simplicity makes it accessible while the parameterization allows for customization to different market conditions and instruments.
+The `StairsCountertrend` strategy is an implementation of a countertrend trading approach that seeks to profit from potential price reversals after consistent directional moves.
+Its simplicity makes it accessible while the parameterization allows for customization to different market conditions and instruments.
 
 Key advantages of this implementation include:
 - Clean integration with StockSharp's high-level APIs
@@ -163,4 +170,5 @@ Key advantages of this implementation include:
 - Proper state management
 - Simple yet effective pattern recognition
 
-This strategy can be effective in range-bound or oscillating markets where price movements tend to revert after reaching extremes. However, it may underperform in strongly trending markets where countertrend signals can lead to premature entries against the dominant trend.
+This strategy can be effective in range-bound or oscillating markets where price movements tend to revert after reaching extremes.
+However, it may underperform in strongly trending markets where countertrend signals can lead to premature entries against the dominant trend.

@@ -1,12 +1,14 @@
 # StockSharp.Configuration
 
-`StockSharp.Configuration` is a .NET Standard library that centralizes various configuration facilities used by the StockSharp trading platform. It provides classes for storing application paths, loading settings, managing user credentials, and constructing message adapters.
+`StockSharp.Configuration` is a .NET Standard library that centralizes various configuration facilities used by the StockSharp trading platform.
+It provides classes for storing application paths, loading settings, managing user credentials, and constructing message adapters.
 The assembly is titled **S#.Configuration** and described as "Configuration components."
 
 
 ## Features
 
-- **System paths** – the `Paths` class defines all important directories and files used by StockSharp. Paths are initialized from `PathsHolder` and configuration files, as shown below:
+- **System paths** – the `Paths` class defines all important directories and files used by StockSharp.
+  Paths are initialized from `PathsHolder` and configuration files, as shown below:
   ```csharp
   var companyPath = PathsHolder.CompanyPath ?? ConfigManager.TryGet<string>("companyPath");
   CompanyPath = companyPath.IsEmpty() ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "StockSharp") : companyPath.ToFullPathIfNeed();
@@ -30,7 +32,8 @@ The assembly is titled **S#.Configuration** and described as "Configuration comp
   }
   ```
   【F:Configuration/AppStartSettings.cs†L4-L41】
-- **Credentials management** – the `ICredentialsProvider` interface allows loading, saving and deleting of `ServerCredentials`. The default implementation persists credentials in `Paths.CredentialsFile`:
+- **Credentials management** – the `ICredentialsProvider` interface allows loading, saving and deleting of `ServerCredentials`.
+  The default implementation persists credentials in `Paths.CredentialsFile`:
   ```csharp
   public interface ICredentialsProvider
   {
@@ -68,7 +71,8 @@ The assembly is titled **S#.Configuration** and described as "Configuration comp
   }
   ```
   【F:Configuration/DefaultCredentialsProvider.cs†L3-L38】
-- **Invariant serialization** – `InvariantCultureSerializer` saves configuration files using the invariant culture and UTF‑8 encoding, enabling culture‑independent settings:
+- **Invariant serialization** – `InvariantCultureSerializer` saves configuration files using the invariant culture and UTF‑8 encoding,
+  enabling culture‑independent settings:
   ```csharp
   public static class InvariantCultureSerializer
   {

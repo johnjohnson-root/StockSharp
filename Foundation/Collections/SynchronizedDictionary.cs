@@ -4,11 +4,12 @@ namespace StockSharp.Foundation.Collections;
 /// Thread-safe <see cref="IDictionary{TKey, TValue}"/>.
 /// </summary>
 /// <remarks>
-/// Every member takes <see cref="SyncRoot"/>. Enumeration and the <see cref="Keys"/> /
-/// <see cref="Values"/> collections hand back snapshots rather than live views, so a
-/// caller can enumerate while another thread mutates without risking
-/// <see cref="InvalidOperationException"/>. Callers needing several operations to be
-/// atomic with respect to each other should hold <see cref="SyncRoot"/> across them.
+/// Every member takes <see cref="SyncRoot"/>.
+/// Enumeration and the <see cref="Keys"/> / <see cref="Values"/> collections
+/// hand back snapshots rather than live views,
+/// so a caller can enumerate while another thread mutates
+/// without risking <see cref="InvalidOperationException"/>.
+/// Hold <see cref="SyncRoot"/> across several operations to make them atomic with respect to each other.
 /// </remarks>
 /// <typeparam name="TKey">Key type.</typeparam>
 /// <typeparam name="TValue">Value type.</typeparam>
@@ -47,7 +48,7 @@ public class SynchronizedDictionary<TKey, TValue> : IDictionary<TKey, TValue>, I
 	protected Dictionary<TKey, TValue> Inner => _inner;
 
 	/// <summary>
-	/// Take <see cref="SyncRoot"/> for the duration of the returned scope.
+	/// Takes <see cref="SyncRoot"/> for the duration of the returned scope.
 	/// </summary>
 	/// <returns>Lock scope.</returns>
 	public Lock.Scope EnterScope() => SyncRoot.EnterScope();
@@ -211,8 +212,9 @@ public class SynchronizedDictionary<TKey, TValue> : IDictionary<TKey, TValue>, I
 /// </summary>
 /// <remarks>
 /// The snapshots let callers enumerate without holding <see cref="SynchronizedDictionary{TKey, TValue}.SyncRoot"/>.
-/// A snapshot already handed out is never mutated: a change to the dictionary discards
-/// the cached array, and the next access builds a fresh one.
+/// A snapshot already handed out is never mutated:
+/// a change to the dictionary discards the cached array,
+/// and the next access builds a fresh one.
 /// </remarks>
 /// <typeparam name="TKey">Key type.</typeparam>
 /// <typeparam name="TValue">Value type.</typeparam>
@@ -250,8 +252,7 @@ public class CachedSynchronizedDictionary<TKey, TValue> : SynchronizedDictionary
 	/// <inheritdoc />
 	protected override void OnChanged()
 	{
-		// discard rather than rebuild: a snapshot already handed out must stay unchanged,
-		// and the next reader pays for the copy only if it actually wants one
+		// discard rather than rebuild: a snapshot already handed out must stay unchanged
 		_cachedKeys = null;
 		_cachedValues = null;
 		_cachedPairs = null;

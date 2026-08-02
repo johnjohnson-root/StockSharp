@@ -11,9 +11,8 @@ public class HistoryMessageAdapterTests : BaseTestClass
 {
 	private static SecurityId CreateSecurityId() => Helper.CreateSecurityId();
 
-	// Poll for an expected out-message instead of a fixed delay: the replay runs
-	// on a background task, and under a loaded (parallel) suite any fixed sleep
-	// is eventually too short.
+	// Polls for an expected out-message: the replay runs on a background task, so any
+	// fixed sleep is eventually too short under a loaded parallel suite.
 	private static async Task<T> WaitForMessageAsync<T>(ConcurrentQueue<Message> messages, Func<T, bool> predicate, CancellationToken cancellationToken)
 		where T : Message
 	{
@@ -618,7 +617,6 @@ public class HistoryMessageAdapterTests : BaseTestClass
 
 		await adapter.SendInMessageAsync(stateMsg, CancellationToken);
 
-		// Should have EmulationStateMessage with Stopping state
 		var stoppingState = await WaitForMessageAsync<EmulationStateMessage>(
 			outMessages, m => m.State == ChannelStates.Stopping && m.Error != null, CancellationToken);
 
@@ -627,7 +625,6 @@ public class HistoryMessageAdapterTests : BaseTestClass
 		(stoppingState.Error is InvalidOperationException).AssertTrue();
 		stoppingState.LocalTime.AssertEqual(manager.StopDate);
 
-		// The thrown manager exception should surface as an ErrorMessage (the test name promises an error).
 		var errorMsg = outMessages.OfType<ErrorMessage>().FirstOrDefault();
 		errorMsg.AssertNotNull("Should have sent an ErrorMessage for the manager failure");
 	}
@@ -657,17 +654,14 @@ public class HistoryMessageAdapterTests : BaseTestClass
 
 		await adapter.SendInMessageAsync(stateMsg, CancellationToken);
 
-		// Wait for the background replay task to actually start (fixed sleeps race
-		// against a loaded test host).
+		// Poll for the background replay task to start; a fixed sleep races a loaded test host.
 		for (var i = 0; i < 100 && !manager.IsStarted; i++)
 			await Task.Delay(50, CancellationToken);
 
 		manager.IsStarted.AssertTrue("replay task did not start");
 
-		// Stop the adapter
 		await adapter.SendInMessageAsync(new EmulationStateMessage { State = ChannelStates.Stopping }, CancellationToken);
 
-		// Should have EmulationStateMessage with Stopping state
 		var stoppingState = await WaitForMessageAsync<EmulationStateMessage>(
 			outMessages, m => m.State == ChannelStates.Stopping, CancellationToken);
 
@@ -708,7 +702,6 @@ public class HistoryMessageAdapterTests : BaseTestClass
 
 		await adapter.SendInMessageAsync(stateMsg, CancellationToken);
 
-		// Should have received the tick message
 		var receivedTick = await WaitForMessageAsync<ExecutionMessage>(
 			outMessages, m => m.DataTypeEx == DataType.Ticks, CancellationToken);
 
@@ -754,7 +747,6 @@ public class HistoryMessageAdapterTests : BaseTestClass
 
 		await adapter.SendInMessageAsync(stateMsg, CancellationToken);
 
-		// Should have received generator-produced tick
 		var receivedTick = await WaitForMessageAsync<ExecutionMessage>(
 			outMessages, m => m.DataTypeEx == DataType.Ticks, CancellationToken);
 
@@ -770,7 +762,6 @@ public class HistoryMessageAdapterTests : BaseTestClass
 		var manager = new TestHistoryMarketDataManager();
 		var secId = CreateSecurityId();
 
-		// No storage, only generator
 		manager.RegisterGenerator(secId, DataType.Ticks, new RandomWalkTradeGenerator(secId), 1);
 
 		using var adapter = new HistoryMessageAdapter(
@@ -792,11 +783,9 @@ public class HistoryMessageAdapterTests : BaseTestClass
 
 		var manager = new TestHistoryMarketDataManager();
 
-		// Register multiple generators
 		manager.RegisterGenerator(secId, DataType.Ticks, new RandomWalkTradeGenerator(secId), 1);
 		manager.RegisterGenerator(secId, DataType.Level1, new RandomWalkTradeGenerator(secId), 2);
 
-		// Simulate output from both generators
 		var tickMessage = new ExecutionMessage
 		{
 			SecurityId = secId,
@@ -827,7 +816,7 @@ public class HistoryMessageAdapterTests : BaseTestClass
 
 		await adapter.SendInMessageAsync(new EmulationStateMessage { State = ChannelStates.Starting }, CancellationToken);
 
-		// Wait for messages with retry - more robust than fixed delay
+		// Poll until both message types arrive; the replay runs on a background task.
 		const int maxRetries = 50;
 		const int delayMs = 50;
 		for (var i = 0; i < maxRetries; i++)
@@ -839,7 +828,6 @@ public class HistoryMessageAdapterTests : BaseTestClass
 			await Task.Delay(delayMs, CancellationToken);
 		}
 
-		// Should have received both types of messages
 		var ticks = outMessages.OfType<ExecutionMessage>().Where(m => m.DataTypeEx == DataType.Ticks).ToList();
 		var level1s = outMessages.OfType<Level1ChangeMessage>().ToList();
 
@@ -859,16 +847,15 @@ public class HistoryMessageAdapterTests : BaseTestClass
 			secProvider,
 			manager);
 
-		// Start the adapter first, so the generator is registered AFTER start (as the test name states).
+		// Start first, so the generator is registered after the replay is under way.
 		adapter.NewOutMessageAsync += (m, ct) => default;
 		await adapter.SendInMessageAsync(new EmulationStateMessage { State = ChannelStates.Starting }, CancellationToken);
 		await Task.Delay(50, CancellationToken);
 
-		// Query supported types BEFORE the generator is registered (populates the adapter's per-security cache).
+		// Query before registering, to populate the adapter's per-security cache.
 		var before = await adapter.GetSupportedMarketDataTypesAsync(secId, null, null).ToListAsync(CancellationToken);
 		before.Count(dt => dt == DataType.Ticks).AssertEqual(0, "No tick generator registered yet");
 
-		// Register generator through adapter, after start
 		var generatorMsg = new GeneratorMessage
 		{
 			SecurityId = secId,
@@ -880,10 +867,9 @@ public class HistoryMessageAdapterTests : BaseTestClass
 
 		await adapter.SendInMessageAsync(generatorMsg, CancellationToken);
 
-		// Verify generator is tracked
 		manager.HasGenerator(secId, DataType.Ticks).AssertTrue();
 
-		// After registering the generator, the adapter must report its data type (querying again).
+		// The second query must miss the cache the first one populated.
 		var after = await adapter.GetSupportedMarketDataTypesAsync(secId, null, null).ToListAsync(CancellationToken);
 		after.Count(dt => dt == DataType.Ticks).AssertEqual(1, "Supported types should include the newly registered generator");
 	}

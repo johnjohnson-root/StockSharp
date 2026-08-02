@@ -2,7 +2,8 @@
 
 ## Overview
 
-This application illustrates how to integrate StockSharp's charting capabilities with custom and standard indicators for financial market analysis. The main components are two moving averages displayed alongside the candlestick data for the stock "SBER@TQBR".
+This application illustrates how to integrate StockSharp's charting capabilities with custom and standard indicators for financial market analysis.
+The main components are two moving averages displayed alongside the candlestick data for the stock "SBER@TQBR".
 
 ## Detailed Code Breakdown
 
@@ -41,7 +42,8 @@ public MainWindow()
 
 ### Data Loading and Indicator Processing
 
-The code loads candle data and processes it through two indicators, drawing results on the chart:
+The code loads candle data and processes it through two indicators,
+drawing results on the chart:
 
 ```csharp
 var secId = "SBER@TQBR".ToSecurityId();
@@ -68,7 +70,8 @@ foreach (var candle in candles)
 
 ### Custom Indicator Definition: LazyMovingAverage
 
-The custom indicator, `LazyMovingAverage`, is defined with a simplified approach to smoothing data points, creating a "lazy" average:
+The custom indicator, `LazyMovingAverage`, is defined with a simplified approach to smoothing data points,
+creating a "lazy" average:
 
 ```csharp
 internal class LazyMovingAverage : BaseIndicator
@@ -88,8 +91,13 @@ internal class LazyMovingAverage : BaseIndicator
 }
 ```
 
-This indicator starts with the first value it receives and then gradually adjusts towards new data points, moving towards them at a rate determined by the `Length` property.
+This indicator starts with the first value it receives
+and then gradually adjusts towards new data points,
+moving towards them at a rate determined by the `Length` property.
 
 ## Conclusion
 
-This WPF application provides an effective way to visualize how different types of moving averages respond to the same data set, helping traders or analysts to compare the sensitivity and lag of each indicator. The Lazy Moving Average offers a more gradual adjustment to price changes compared to the more responsive Simple Moving Average. This example can be adapted or extended to include other types of indicators or financial data for more comprehensive analysis.
+This WPF application provides an effective way to visualize how different types of moving averages respond to the same data set,
+helping traders or analysts to compare the sensitivity and lag of each indicator.
+The Lazy Moving Average offers a more gradual adjustment to price changes compared to the more responsive Simple Moving Average.
+This example can be adapted or extended to include other types of indicators or financial data for more comprehensive analysis.

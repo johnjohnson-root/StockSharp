@@ -2,7 +2,9 @@
 
 ## Overview
 
-StockSharp.Algo.Gpu is a specialized library that provides GPU-accelerated calculations for technical indicators using the [ILGPU](https://github.com/m4rs-mt/ILGPU) framework. It enables massive parallel processing of market data indicators on CUDA, OpenCL, and CPU accelerators, offering significant performance improvements for batch calculations and strategy optimization scenarios.
+StockSharp.Algo.Gpu is a specialized library that provides GPU-accelerated calculations for technical indicators using the [ILGPU](https://github.com/m4rs-mt/ILGPU) framework.
+It enables massive parallel processing of market data indicators on CUDA, OpenCL, and CPU accelerators,
+offering significant performance improvements for batch calculations and strategy optimization scenarios.
 
 ## Features
 

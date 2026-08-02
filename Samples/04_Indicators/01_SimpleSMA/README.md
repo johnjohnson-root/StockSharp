@@ -2,7 +2,10 @@
 
 ## Overview
 
-This `MainWindow` class in a WPF application illustrates how to load historical candle data, compute a simple moving average (SMA) indicator for this data, and visually represent both the candles and the SMA on a chart. The application uses StockSharp's library to manage and display financial market data.
+This `MainWindow` class in a WPF application illustrates how to load historical candle data,
+compute a simple moving average (SMA) indicator for this data,
+and visually represent both the candles and the SMA on a chart.
+The application uses StockSharp's library to manage and display financial market data.
 
 ## Detailed Code Explanation
 
@@ -62,8 +65,12 @@ foreach (var candle in candles)
 ```
 - **Candle Storage**: Fetches one-minute candles for the security "SBER@TQBR" using the local storage path.
 - **SMA Calculation**: The `SimpleMovingAverage` indicator with a length of 10 periods is updated with each candle.
-- **Drawing on Chart**: Groups data by the opening time of the candle and adds both the candle and the computed SMA value to the chart for visualization.
+- **Drawing on Chart**: Groups data by the opening time of the candle
+  and adds both the candle and the computed SMA value to the chart for visualization.
 
 ## Conclusion
 
-This program efficiently demonstrates how to use StockSharp's charting capabilities to visualize financial data and technical indicators, specifically showing how to superimpose a simple moving average on candlestick data. The application is designed to help traders or analysts visually interpret market trends and the impact of trading strategies based on historical data. Adjustments can be made to the SMA parameters or the visual styling to better suit specific analytical needs or preferences.
+This program efficiently demonstrates how to use StockSharp's charting capabilities to visualize financial data and technical indicators,
+specifically showing how to superimpose a simple moving average on candlestick data.
+The application is designed to help traders or analysts visually interpret market trends and the impact of trading strategies based on historical data.
+Adjustments can be made to the SMA parameters or the visual styling to better suit specific analytical needs or preferences.

@@ -2,7 +2,11 @@
 
 ## Overview
 
-This `MainWindow` class within a WPF application demonstrates how to establish a connection to Hydra via the FIX protocol to fetch market data, similarly to how one would connect to a conventional trading exchange. The code is structured to handle historical candle data and display it in a chart format, offering functionalities to configure and save connection settings, and dynamically subscribe to different securities' data.
+This `MainWindow` class within a WPF application demonstrates how to establish a connection to Hydra via the FIX protocol to fetch market data,
+similarly to how one would connect to a conventional trading exchange.
+The code is structured to handle historical candle data and display it in a chart format,
+offering functionalities to configure and save connection settings,
+and dynamically subscribe to different securities' data.
 
 ## Key Components and Functionalities
 
@@ -63,7 +67,8 @@ public MainWindow()
 }
 ```
 
-- **Connector Setup**: Initializes the `Connector`, which manages connections and data flow.
+- **Connector Setup**: Initializes the `Connector`,
+  which manages connections and data flow.
 - **Default Connection Configuration**: Creates a default FIX connection to Hydra with anonymous access by default (password commented out).
 - **Transaction Support Disabled**: Explicitly turns off transactional messages support for the adapter.
 - **Configuration Loading**: Loads saved configurations if available.
@@ -107,7 +112,8 @@ private void Setting_Click(object sender, RoutedEventArgs e)
 
 ### Connection Establishment
 
-Triggered by a button click, the method initiates a connection to Hydra:
+Triggered by a button click,
+the method initiates a connection to Hydra:
 
 ```csharp
 private void Connect_Click(object sender, RoutedEventArgs e)
@@ -120,7 +126,8 @@ private void Connect_Click(object sender, RoutedEventArgs e)
 
 ### Data Subscription and Processing
 
-Upon selecting a security, this section subscribes to candle data:
+Upon selecting a security,
+this section subscribes to candle data:
 
 ```csharp
 private void SecurityPicker_SecuritySelected(Security security)
@@ -153,10 +160,12 @@ private void SecurityPicker_SecuritySelected(Security security)
 }
 ```
 
-- **Subscription Management**: Unsubscribes from previous data streams and sets up a new subscription for the selected security.
+- **Subscription Management**: Unsubscribes from previous data streams
+  and sets up a new subscription for the selected security.
 - **Date Range**: Sets the historical data range based on the selected dates.
 - **Build Mode Option**: Allows building candles from tick data if the corresponding checkbox is checked.
-- **Chart Setup**: Prepares a new chart area and adds a candle element for visualization.
+- **Chart Setup**: Prepares a new chart area
+  and adds a candle element for visualization.
 - **Subscription Activation**: Subscribes to the data according to the specified parameters.
 
 ### Candle Data Visualization
@@ -186,4 +195,9 @@ private void Connector_CandleSeriesProcessing(Subscription subscription, ICandle
 
 ## Conclusion
 
-This example efficiently demonstrates how to use the FIX protocol with the Hydra system to retrieve historical market data. The application follows the "read-only" pattern by explicitly disabling transaction support, making it ideal for market data analysis without trading functionality. The WPF interface allows for dynamic interaction with historical data, selecting securities, adjusting timeframes, and visualizing the results in a chart. The system is designed to be user-friendly with proper error handling and localization support.
+This example efficiently demonstrates how to use the FIX protocol with the Hydra system to retrieve historical market data.
+The application follows the "read-only" pattern by explicitly disabling transaction support,
+making it ideal for market data analysis without trading functionality.
+The WPF interface allows for dynamic interaction with historical data,
+selecting securities, adjusting timeframes, and visualizing the results in a chart.
+The system is designed to be user-friendly with proper error handling and localization support.

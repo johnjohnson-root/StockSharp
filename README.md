@@ -8,7 +8,12 @@
 
 ## About this fork ##
 
-This fork preserves the last **Apache-2.0** licensed state of StockSharp. Upstream replaced the Apache license with a proprietary EULA-based notice on 2026-07-16; this repository's `master` is the direct parent of that change (upstream commit `22ca8fb69`) plus standalone-build fixes, and contains no code from the proprietary era. The `LICENSE` file here remains Apache License 2.0.
+This fork preserves the last **Apache-2.0** licensed state of StockSharp.
+Upstream replaced the Apache license with a proprietary EULA-based notice on 2026-07-16;
+this repository's `master` is the direct parent of that change
+(upstream commit `22ca8fb69`) plus standalone-build fixes,
+and contains no code from the proprietary era.
+The `LICENSE` file here remains Apache License 2.0.
 
 ### Build from source ###
 
@@ -19,33 +24,46 @@ dotnet build StockSharp.slnx
 dotnet test StockSharp_Tests.slnx
 ```
 
-Requires the .NET 10 SDK. Both solutions reference only projects inside this repository — no private sibling repos, no private NuGet feeds, no folder-name requirements. Not included in the solutions: the WPF-only `Media` project, the `Samples` (they reference StockSharp NuGet binaries), and all proprietary connectors/GUI products described below, which were never part of this repository.
+The build requires the .NET 10 SDK.
+Both solutions reference only projects inside this repository —
+no private sibling repos, no private NuGet feeds, no folder-name requirements.
+The solutions exclude the WPF-only `Media` project,
+the `Samples` (which reference StockSharp NuGet binaries),
+and all proprietary connectors and GUI products described below,
+which were never part of this repository.
 
 ### Dependency pinning and mirroring ###
 
-External package versions are pinned in `Directory.Build.targets` to the newest
-releases published before the license change, and `NuGet.config` declares a
-deterministic source list. Because several pinned packages (`Ecng.*`,
-`StockSharp.Samples.HistoryData`) are published by the upstream owner, the
-repository also supports a local mirror feed that survives any unpublish:
-run `./tools/mirror-packages.sh` to capture the full package closure into
-`nuget-mirror/` (see `nuget-mirror/README.md`), or run the `Mirror packages`
-GitHub workflow to produce it as a CI artifact.
+`Directory.Build.targets` pins external package versions
+to the newest releases published before the license change,
+and `NuGet.config` declares a deterministic source list.
+The upstream owner publishes several of the pinned packages
+(`Ecng.*`, `StockSharp.Samples.HistoryData`),
+so the repository also supports a local mirror feed that survives any unpublish:
+run `./tools/mirror-packages.sh` to capture the full package closure
+into `nuget-mirror/` (see `nuget-mirror/README.md`),
+or run the `Mirror packages` GitHub workflow to produce it as a CI artifact.
 
 ### Fork packages ###
 
-`./tools/pack.sh` (or the `Pack` GitHub workflow) builds NuGet packages for
-every library in `StockSharp.slnx` under fork-branded ids — `SSharp.*` by
-default, configurable via `-p:ForkPackagePrefix=...` (see
-`common_packaging.props`). Assembly names and namespaces remain `StockSharp.*`,
-so switching a consumer from upstream packages to these is only a
-`PackageReference` id change. Publishing to a feed is a deliberate manual step.
+`./tools/pack.sh` (or the `Pack` GitHub workflow)
+builds NuGet packages for every library in `StockSharp.slnx`
+under fork-branded ids —
+`StockShark.*` by default,
+configurable via `-p:ForkPackagePrefix=...` (see `common_packaging.props`).
+Assembly names and namespaces remain `StockSharp.*`,
+so switching a consumer from upstream packages to these
+is only a `PackageReference` id change.
+Publishing to a feed is a deliberate manual step.
 
 ## Introduction ##
 
-**StockSharp** (**S#** for short) – is a **free** platform for trading on any market in the world (crypto exchanges, American, European, Asian, Russian, stocks, futures, options, Bitcoins, forex, etc.). You will be able to trade manually or automatically (algorithmic trading robots, conventional or HFT).
+**StockSharp** (**S#** for short) – is a **free** platform for trading on any market in the world
+(crypto exchanges, American, European, Asian, Russian, stocks, futures, options, Bitcoins, forex, etc.).
+You will be able to trade manually or automatically (algorithmic trading robots, conventional or HFT).
 
-**Available connections**: Binance, MT4, MT5, FIX/FAST, PolygonIO, Trading Technologies, Alpaca Markets, BarChart, CQG, E*Trade, IQFeed, InteractiveBrokers, LMAX, MatLab, Oanda, FXCM, Rithmic, cTrader, DXtrade, BitStamp, Bitfinex, Coinbase, Kraken, Poloniex, GDAX, Bittrex, Bithumb, OKX, Coincheck, CEX.IO, BitMEX, YoBit, Livecoin, EXMO, Deribit, HTX, KuCoin, QuantFEED, Aster, edgeX, Ligther, Paradex, Hyperliquid and many others.
+**Available connections**:
+Binance, MT4, MT5, FIX/FAST, PolygonIO, Trading Technologies, Alpaca Markets, BarChart, CQG, E*Trade, IQFeed, InteractiveBrokers, LMAX, MatLab, Oanda, FXCM, Rithmic, cTrader, DXtrade, BitStamp, Bitfinex, Coinbase, Kraken, Poloniex, GDAX, Bittrex, Bithumb, OKX, Coincheck, CEX.IO, BitMEX, YoBit, Livecoin, EXMO, Deribit, HTX, KuCoin, QuantFEED, Aster, edgeX, Ligther, Paradex, Hyperliquid and many others.
 
 ## [Designer][8]
 <img src="./Media/Designer500.gif" align="left" />
@@ -99,7 +117,10 @@ so switching a consumer from upstream packages to these is only a
   - Launch strategies on schedule
 
 ## [API][12]
-API is a **free** C# library for programmers who use Visual Studio. The API lets you create any trading strategy, from long-timeframe positional strategies to high-frequency strategies (HFT) with direct access to the exchange (DMA). [More info...][12]
+API is a **free** C# library for programmers who use Visual Studio.
+The API lets you create any trading strategy,
+from long-timeframe positional strategies to high-frequency strategies (HFT) with direct access to the exchange (DMA).
+[More info...][12]
 ### Connector example
 ```C#
 var connector = new Connector();

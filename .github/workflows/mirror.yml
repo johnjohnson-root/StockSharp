@@ -1,10 +1,12 @@
 name: Mirror packages
 
-# Produces a self-contained NuGet folder feed with the exact package closure
-# both solutions build against (see tools/mirror-packages.sh and NuGet.config).
-# Run it manually and stash the artifact somewhere durable; it is the recovery
-# path if any pinned upstream package (Ecng.*, HistoryData, ...) is ever
-# unpublished or delisted.
+# Produces a self-contained NuGet folder feed
+# carrying the exact package closure both solutions build against
+# (see tools/mirror-packages.sh and NuGet.config).
+# Run it manually and stash the artifact somewhere durable:
+# it is the recovery path
+# wherever a pinned upstream package (Ecng.*, HistoryData, ...)
+# goes unpublished or delisted.
 
 on:
   workflow_dispatch:
@@ -29,8 +31,13 @@ jobs:
         run: ./tools/mirror-packages.sh
 
       - name: Verify offline restore from mirror
+        # --no-http-cache is defence in depth:
+        # a folder feed restores from disk alone today,
+        # and the flag keeps the "offline" claim honest
+        # wherever a remote source reaches this restore later.
         run: |
-          dotnet restore StockSharp_Tests.slnx --source ./nuget-mirror --packages "$RUNNER_TEMP/verify-pkgs"
+          dotnet restore StockSharp_Tests.slnx --source ./nuget-mirror --no-http-cache --packages "$RUNNER_TEMP/verify-pkgs"
+          dotnet restore StockSharp_Samples.slnx --source ./nuget-mirror --no-http-cache --packages "$RUNNER_TEMP/verify-pkgs"
 
       - name: Upload mirror artifact
         uses: actions/upload-artifact@v4

@@ -2,7 +2,9 @@
 
 ## Overview
 
-This program illustrates how to connect to Hydra operating in server mode and retrieve various types of market data using the StockSharp framework. It includes setting up remote data retrieval, storing it locally, and displaying some of the data to the user.
+This program illustrates how to connect to Hydra operating in server mode
+and retrieve various types of market data using the StockSharp framework.
+It includes setting up remote data retrieval, storing it locally, and displaying some of the data to the user.
 
 ## Detailed Code Walkthrough
 
@@ -162,4 +164,8 @@ foreach (var dataType in remoteDrive.GetAvailableDataTypes(secId, format))
 
 ## Conclusion
 
-This example demonstrates how to connect to Hydra in server mode, retrieve cryptocurrency market data (specifically BTCUSDT futures), and store it locally for further analysis. The program uses anonymous access by default and retrieves a 30-day history of available data types. This setup is ideal for applications requiring automated data retrieval and storage management in cryptocurrency markets analysis. The code can be adapted for different securities, date ranges, or authentication methods as needed.
+This example demonstrates how to connect to Hydra in server mode, retrieve cryptocurrency market data (specifically BTCUSDT futures), and store it locally for further analysis.
+The program uses anonymous access by default
+and retrieves a 30-day history of available data types.
+This setup is ideal for applications requiring automated data retrieval and storage management in cryptocurrency markets analysis.
+The code can be adapted for different securities, date ranges, or authentication methods as needed.

@@ -2,9 +2,11 @@
 
 ## Overview
 
-`StockSharp.Alerts.Interfaces` provides the common interfaces and data types required to implement alert systems within the [StockSharp](https://stocksharp.com/en) trading platform. The package defines a standard way for libraries or applications to create, configure, and deliver notifications when specific trading conditions occur.
+`StockSharp.Alerts.Interfaces` provides the common interfaces and data types required to implement alert systems within the [StockSharp](https://stocksharp.com/en) trading platform.
+The package defines a standard way for libraries or applications to create, configure, and deliver notifications when specific trading conditions occur.
 
-This project only contains contracts and helper classes. Actual implementations of notification channels or alert processing engines are expected to be provided by other StockSharp components or by third‑party libraries.
+This project only contains contracts and helper classes.
+Actual implementations of notification channels or alert processing engines are expected to be provided by other StockSharp components or by third‑party libraries.
 
 ## Key Components
 
@@ -47,6 +49,7 @@ schema.Rules.Add(new AlertRule
 AlertServicesRegistry.ProcessingService.Register(schema);
 ```
 
-When the `IAlertProcessingService` receives an `ExecutionMessage` that satisfies the rule, the configured notification service will deliver a message to the selected channel.
+When the `IAlertProcessingService` receives an `ExecutionMessage` that satisfies the rule,
+the configured notification service will deliver a message to the selected channel.
 
 

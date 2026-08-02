@@ -2,7 +2,9 @@
 
 ## Overview
 
-This program is designed to load and display various types of market data using the StockSharp framework, interacting with a [local market data drive](https://doc.stocksharp.com/en/topics/api/market_data_storage.html). It handles securities, candles, trades, market depths, level1 messages, and an expression-based index.
+This program is designed to load and display various types of market data using the StockSharp framework,
+interacting with a [local market data drive](https://doc.stocksharp.com/en/topics/api/market_data_storage.html).
+It handles securities, candles, trades, market depths, level1 messages, and an expression-based index.
 
 ## Detailed Code Explanation
 
@@ -12,7 +14,8 @@ This program is designed to load and display various types of market data using 
 var pathHistory = Paths.HistoryDataPath;
 var localDrive = new LocalMarketDataDrive(pathHistory);
 ```
-This initializes the path for historical data and sets up a local drive to manage this data.
+This initializes the path for historical data
+and sets up a local drive to manage this data.
 
 ### Listing Available Securities
 
@@ -64,7 +67,8 @@ foreach (var marketDepth in marketDepths)
 }
 Console.ReadLine();
 ```
-This part of the program loads and displays [market depth](https://doc.stocksharp.com/en/topics/api/order_books.html) data, showing bid and ask prices and quantities.
+This part of the program loads and displays [market depth](https://doc.stocksharp.com/en/topics/api/order_books.html) data,
+showing bid and ask prices and quantities.
 
 ### Loading and Displaying Level1 Messages
 
@@ -77,7 +81,8 @@ foreach (var level1 in levels1)
 }
 Console.ReadLine();
 ```
-This section loads and prints Level1 messages, which contain various fundamental and technical data points for a security.
+This section loads and prints Level1 messages,
+which contain various fundamental and technical data points for a security.
 
 ### Expression-Based Index Creation
 
@@ -90,7 +95,8 @@ var basketSecurity = new ExpressionIndexSecurity
     BasketExpression = $"{secId} + 987654321",
 };
 ```
-This configures an [expression-based index](https://doc.stocksharp.com/en/topics/api/instruments/index.html) which is calculated using the specified formula. This demonstrates how to extend the application to handle composite securities based on expressions.
+This configures an [expression-based index](https://doc.stocksharp.com/en/topics/api/instruments/index.html) which is calculated using the specified formula.
+This demonstrates how to extend the application to handle composite securities based on expressions.
 
 ### Calculating and Displaying Index Candles
 
@@ -112,8 +118,11 @@ foreach (var candle in indexCandles)
 }
 Console.ReadLine();
 ```
-This section creates candles for the index based on candles from its component securities. This is useful for analyzing composite instruments like indexes or baskets of stocks.
+This section creates candles for the index based on candles from its component securities.
+This is useful for analyzing composite instruments like indexes or baskets of stocks.
 
 ## Conclusion
 
-This detailed documentation is designed to guide a developer through understanding and possibly modifying the application to handle different securities or data types, demonstrating robust data handling and visualization techniques using the StockSharp framework. Adjust the documentation as needed to fit the specifics of your implementation or project requirements.
+This detailed documentation is designed to guide a developer through understanding and possibly modifying the application to handle different securities or data types,
+demonstrating robust data handling and visualization techniques using the StockSharp framework.
+Adjust the documentation as needed to fit the specifics of your implementation or project requirements.

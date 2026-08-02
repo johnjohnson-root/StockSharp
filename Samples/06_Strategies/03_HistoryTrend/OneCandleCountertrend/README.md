@@ -2,7 +2,9 @@
 
 ## Overview
 
-This strategy aims to take advantage of small reversals or "countertrend" moves in the market by issuing buy or sell orders based on the closing conditions of individual candles compared to their openings. The logic assumes that if a candle closes higher than it opens, the next move might be downward, and vice versa.
+This strategy aims to take advantage of small reversals or "countertrend" moves in the market by issuing buy or sell orders based on the closing conditions of individual candles compared to their openings.
+The logic assumes that if a candle closes higher than it opens,
+the next move might be downward, and vice versa.
 
 ## Key Components
 
@@ -44,7 +46,8 @@ This helps platforms like Designer properly initialize the required data.
 
 ### Strategy Start
 
-When the strategy starts, it sets up subscriptions and visualization:
+When the strategy starts,
+it sets up subscriptions and visualization:
 
 ```csharp
 protected override void OnStarted2(DateTime time)
@@ -103,9 +106,12 @@ private void ProcessCandle(ICandleMessage candle)
 - **Candle Completion Check**: Only processes candles that have finished forming.
 - **Strategy Readiness Check**: Uses the combined check `IsFormedAndOnlineAndAllowTrading()` to ensure the strategy is in a proper state for trading.
 - **Countertrend Logic**: 
-  - If the candle is bullish (close > open) and the position is long or neutral, it sells.
-  - If the candle is bearish (open > close) and the position is short or neutral, it buys.
-- **Position Scaling**: When entering a position, the strategy adjusts the order volume to include any existing position.
+  - If the candle is bullish (close > open) and the position is long or neutral,
+    it sells.
+  - If the candle is bearish (open > close) and the position is short or neutral,
+    it buys.
+- **Position Scaling**: When entering a position,
+  the strategy adjusts the order volume to include any existing position.
 
 ### Trading Operations
 
@@ -114,11 +120,13 @@ The strategy uses high-level trading operation methods for order execution:
 - **SellMarket**: Issues a market order to sell the specified volume.
 - **BuyMarket**: Issues a market order to buy the specified volume.
 
-These methods automatically handle order creation and registration, simplifying the code.
+These methods automatically handle order creation and registration,
+simplifying the code.
 
 ## Conclusion
 
-The `OneCandleCountertrend` strategy demonstrates how to implement a reactive trading mechanism based on candlestick data in StockSharp. It showcases the use of high-level APIs for market data subscription, candle processing, and order execution.
+The `OneCandleCountertrend` strategy demonstrates how to implement a reactive trading mechanism based on candlestick data in StockSharp.
+It showcases the use of high-level APIs for market data subscription, candle processing, and order execution.
 
 Key advantages of this implementation include:
 - Clean, concise code using StockSharp's high-level APIs
@@ -127,4 +135,5 @@ Key advantages of this implementation include:
 - Comprehensive state checking before trading
 - Automatic subscription management
 
-This strategy serves as a good foundation that can be extended with more complex rules or incorporated into a larger trading system with multiple strategies.
+This strategy serves as a good foundation that can be extended with more complex rules
+or incorporated into a larger trading system with multiple strategies.

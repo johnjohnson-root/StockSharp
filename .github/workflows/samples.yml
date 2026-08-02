@@ -1,0 +1,32 @@
+name: Samples
+
+# Compile-checks the samples against the fork's own projects, so an API change
+# that breaks a sample breaks the build that ships it (decision record 0005).
+# One OS by design: this leg compile-checks documentation rather than producing
+# shipped binaries, and every sample in the solution targets net10.0 with no
+# platform-specific code, so a second OS would repeat the same compilation.
+# Samples/README.md lists the samples this solution excludes and why.
+
+on:
+  push:
+    branches: [ master, standalone-build ]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            6.0.x
+            10.0.x
+
+      - name: Build samples solution
+        run: dotnet build StockSharp_Samples.slnx -c Release

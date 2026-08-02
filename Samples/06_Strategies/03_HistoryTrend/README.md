@@ -2,13 +2,16 @@
 
 ## Overview
 
-The application is designed to facilitate the backtesting of multiple trading strategies by replaying historical market data through a `HistoryEmulationConnector`. This setup allows for evaluating the performance of strategies such as `OneCandleCountertrend`, `OneCandleTrend`, `StairsCountertrend`, and `StairsTrend` under historically accurate market conditions.
+The application is designed to facilitate the backtesting of multiple trading strategies by replaying historical market data through a `HistoryEmulationConnector`.
+This setup allows for evaluating the performance of strategies such as `OneCandleCountertrend`, `OneCandleTrend`, `StairsCountertrend`, and `StairsTrend` under historically accurate market conditions.
 
 ## Key Components of the Application
 
 ### Initialization and Configuration
 
-Upon launching the application, the UI components are initialized, and logging listeners are set up to capture and display relevant information:
+Upon launching the application,
+the UI components are initialized,
+and logging listeners are set up to capture and display relevant information:
 
 ```csharp
 public MainWindow()
@@ -32,7 +35,8 @@ public MainWindow()
 
 ### Strategy Setup and Historical Data Simulation
 
-When the user starts the simulation, the application configures the necessary components for running the selected trading strategy on historical data:
+When the user starts the simulation,
+the application configures the necessary components for running the selected trading strategy on historical data:
 
 ```csharp
 private void Start_Click(object sender, RoutedEventArgs e)
@@ -141,11 +145,14 @@ The application makes it easy to switch between different trading strategies:
 3. **StairsCountertrendStrategy**: Takes counter-trend positions after a specified number of consecutive candles in one direction.
 4. **StairsTrendStrategy**: Takes trend-following positions after a specified number of consecutive candles in one direction.
 
-To select a strategy, simply uncomment the desired strategy line in the `Start_Click` method and comment out the others.
+To select a strategy,
+simply uncomment the desired strategy line in the `Start_Click` method and comment out the others.
 
 ## Conclusion
 
-This application provides a comprehensive environment for testing various trading strategies using historical market data. It leverages StockSharp's powerful backtesting capabilities and combines them with intuitive visualization tools to help traders evaluate and refine their algorithmic trading strategies.
+This application provides a comprehensive environment for testing various trading strategies using historical market data.
+It leverages StockSharp's powerful backtesting capabilities
+and combines them with intuitive visualization tools to help traders evaluate and refine their algorithmic trading strategies.
 
 Key features include:
 - Easy switching between different strategy implementations
