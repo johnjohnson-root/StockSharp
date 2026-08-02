@@ -25,7 +25,7 @@ The standard gate for any code change:
     dotnet test StockSharp_Tests.slnx --no-build -c Release \
       --filter 'FullyQualifiedName!~PythonAnalyticsScripts'
 
-4458 pass, 0 fail, 11 documented skips, prompt test-host exit.
+4461 pass, 0 fail, 11 documented skips, prompt test-host exit.
 A new test earns its place by failing on the unfixed code:
 stash the fix, build, watch the test fail, pop the stash.
 
@@ -220,31 +220,45 @@ WPF samples: a future decision record.
 
 ## Correctness and tests
 
-### T10. Bring GeneticOptimizer to BruteForce's failure semantics
-
-Blocked by: nothing.
+### T10. Genetic failure semantics — done 2026-08-02
 
 `BruteForceOptimizer` workers survive a poisoned iteration, release the
-slot, and cap consecutive failures (commits `f98b0df`, `9b57476`).
-The genetic path awaits `TryNextRunAsync` inside a GeneticSharp fitness
-evaluation and propagates every exception into the GA loop.
+slot, and cap consecutive failures.
+The genetic path had no equivalent:
+its fitness function awaits `TryNextRunAsync` inside a GeneticSharp
+evaluation, so an exception left the evaluation, left `ga.Start()`,
+and reached the driver task `RunAsync` discards —
+unobserved, while the `finally` completed the results channel.
+The caller read a run that died in its first generation as a run that
+finished.
 
-1. Read `GeneticOptimizer.cs` end to end;
-   map what GeneticSharp does with a throwing fitness function
-   (termination? silent chromosome death?) and what `CompleteChannel()`
-   at line ~462 covers.
-2. Decide and implement the parallel behavior:
-   a failed fitness evaluation scores the chromosome worthless
-   (`double.MinValue`, as the iteration-limit path already does)
-   rather than killing the run, with the error logged.
-3. Regression tests mirroring the BruteForce ones:
-   poisoned `StrategyInitialized` for one parameter set — the run
-   completes and other chromosomes evaluate;
-   pre-cancelled token — clean termination, zero results.
-4. Prove each test bites: stash the fix, watch it fail, pop.
+A failed evaluation now scores `double.MinValue` and logs the error,
+the score the iteration-limit path already returns,
+so selection ranks the chromosome last and the population breeds past
+it.
+The failure stays out of the fitness cache,
+so a transient fault does not pin a parameter set worthless for the
+rest of the run.
+`OperationCanceledException` still propagates,
+matching the filter `BruteForceOptimizer`'s worker loop uses.
 
-Verify: `--filter 'FullyQualifiedName~GeneticOptimizer|FullyQualifiedName~OptimizerTests'`
-green; new tests stable over 4 consecutive runs; standard gate green.
+`GeneticRunAsyncSurvivesIterationStartFailure` and
+`GeneticRunAsyncCancelledBeforeStart` mirror the BruteForce pair.
+The bite check ran on 2026-08-02 against a local SDK:
+with the `catch` removed the survival test fails in 2 seconds reporting
+`got 2` — the two chromosomes of the first generation and nothing
+after — and passes restored.
+
+Two configuration notes the test carries, both learned the hard way.
+`BatchSize` stays at its default here where the BruteForce sibling sets
+it to 1: `SetupGA` feeds it to `ParallelTaskExecutor.MaxThreads`, which
+GeneticSharp applies to the process-wide thread pool, so a batch of 1
+starves the emulation pipeline and the run collapses after the first
+evaluation whether or not it survived.
+And the assertion counts iterations started rather than results,
+because the fitness cache returns before starting an iteration on a hit,
+so a converged population stops producing results long before its
+budget runs out.
 
 ### T11. Reconcile the two finish predicates
 

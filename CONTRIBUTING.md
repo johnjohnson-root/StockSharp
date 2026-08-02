@@ -19,6 +19,15 @@ The build needs the .NET 10 SDK.
 so a machine carrying only another feature band fails with a message
 naming the version it wants.
 
+Take that SDK from Microsoft's installer rather than a distribution
+package.
+Ubuntu 24.04's own archive ships the 10.0.1xx band —
+`apt install dotnet-sdk-10.0` lands on 10.0.110 —
+and `rollForward` only moves forward,
+so a 1xx SDK cannot satisfy a 3xx pin however the policy is set.
+`dotnet --version` run at the repository root is the check:
+it prints the pinned line or names the version it wants.
+
     git clone https://github.com/johnjohnson-root/StockSharp.git
     cd StockSharp
     dotnet build StockSharp_Tests.slnx -c Release
