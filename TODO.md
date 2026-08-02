@@ -300,26 +300,44 @@ windows failing makes the defect platform-independent and points the
 investigation at the IronPython `Indicators` import.
 Remove the probe once `KNOWN-ISSUES.md` records the answer.
 
-### T14. Retire the sync-facade shims
+### T14. Retire the sync-facade shims — inventory done, migration staged
 
-Blocked by: nothing.
-Record 0006 sets the latitude:
-internal callers migrate now,
-and the public sync surface holds until 2.0.
+Step 1 is done, and the compiler supplies a better list than the grep
+the item proposed.
+`AsyncHelper.Run` appears at 57 sites, and almost all of them are the
+public sync surface itself —
+`StorageHelper_Obsolete` alone holds 25 —
+which record 0006 keeps until 2.0.
+The internal callers are exactly the `CS0618` warnings the Release
+build already prints, 13 of them in library code:
 
-`KNOWN-ISSUES.md` names the two open items from the async migration:
-`Strategy`'s ordering internals still drive the sync facade
-(pragma-marked), and `AsyncHelper.Run` shims remain in void members
-until callers migrate.
+    BusinessEntities/EntitiesExtensions.cs   127, 134   RegisterOrder, ReRegisterOrder
+    Algo/TraderHelper.cs                     201        CancelOrder
+    Algo/TraderHelper.cs                     1196       Uncompress
+    Algo/Storages/Csv/CsvEntityList.cs       157        Compress
+    Algo.Strategies/Strategy.cs              90, 91     Subscribe, UnSubscribe
+    Algo.Strategies/Strategy_HighLevelMisc.cs 154       Stop
+    Algo.Strategies/Optimization/BaseOptimizer.cs 595, 636  Stop, Start
+    Algo.Strategies/Quoting/QuotingProcessor.cs 183, 200, 447  Subscribe, UnSubscribe
 
-1. `grep -rn 'AsyncHelper.Run' --include='*.cs'` for the shim list and
-   the pragma markers for the ordering internals.
-2. Under compatible maintenance (D4), migrate internal callers to the
-   async members and shrink the shims to the public sync surface alone.
-3. Under a divergence answer, deprecate the sync surface per the policy
-   and record the break in a decision record.
+Watching that count fall is the item's progress measure,
+and reaching zero is what shrinks the `KNOWN-ISSUES.md` entry.
 
-Verify: standard gate green; the KNOWN-ISSUES entry shrinks or closes.
+Step 2 stays open because none of the 13 is a local edit.
+Every one sits in a sync method whose signature would have to change:
+`CsvEntityList` line 157 is inside a `byte[]`-returning member,
+`TraderHelper` line 1196 inside `CreateReader`, which returns a
+`FastCsvReader`,
+and the `QuotingProcessor` and `BaseOptimizer` sites are called from
+sync event handlers where awaiting reorders delivery.
+So each one is a chain of signature changes reaching its callers,
+and the item's own rule —
+each migration compiles and passes the standard gate before the next —
+needs a local build loop rather than a CI round trip per step.
+
+Take them one chain at a time, smallest first:
+the two compression sites reach the fewest callers,
+and the `QuotingProcessor` and ordering-internals chains reach the most.
 
 ### T15. The two in-tree upstream defects — closed 2026-08-02, no work
 
