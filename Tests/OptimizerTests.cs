@@ -676,7 +676,12 @@ public class OptimizerTests : BaseTestClass
 		// first generation, so the remaining 4 can only come from generations the run
 		// reaches after the poisoned evaluation. Unfixed, the GA dies in generation 1
 		// and stops at 2.
-		optimizer.EmulationSettings.BatchSize = 1;
+		//
+		// BatchSize stays at its default here, unlike the BruteForce sibling that sets
+		// it to 1. SetupGA feeds BatchSize to ParallelTaskExecutor.MaxThreads, which
+		// GeneticSharp applies to the process-wide ThreadPool, so a batch of 1 starves
+		// the emulation pipeline every iteration needs and the run collapses after the
+		// first evaluation whether or not it survived the failure.
 		optimizer.EmulationSettings.MaxIterations = 6;
 		optimizer.Settings.Population = 2;
 		optimizer.Settings.PopulationMax = 2;
