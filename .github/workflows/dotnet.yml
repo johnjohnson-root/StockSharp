@@ -24,9 +24,11 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
+          # 10.0.302 is the version global.json pins; keeping the two in
+          # step means the runner installs exactly the SDK the build asks for.
           dotnet-version: |
             6.0.x
-            10.0.x
+            10.0.302
 
       - name: Build StockSharp.slnx
         run: dotnet build StockSharp.slnx --configuration Release
