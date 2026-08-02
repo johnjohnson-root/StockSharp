@@ -4,21 +4,23 @@
 #
 #   ./tools/pack.sh [output-dir]      # default: ./artifacts/nupkgs
 #
-# Package ids default to SSharp.* (rebrand with -p:ForkPackagePrefix=...);
-# assembly names and namespaces stay StockSharp.*, so switching a consumer from
-# upstream packages to these is a PackageReference-id change only.
+# Package ids default to SSharp.* (rebrand with -p:ForkPackagePrefix=...),
+# and assembly names and namespaces stay StockSharp.*,
+# so switching a consumer from upstream packages to these
+# is a PackageReference-id change alone.
 #
-# The version comes from ForkPackageVersion in common_packaging.props; override
-# per release with: PACK_ARGS="-p:ForkPackageVersion=5.0.1" ./tools/pack.sh
+# The version comes from ForkPackageVersion in common_packaging.props;
+# override per release with:
+#   PACK_ARGS="-p:ForkPackageVersion=5.0.1" ./tools/pack.sh
 
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 out="${1:-$root/artifacts/nupkgs}"
 
-# ContinuousIntegrationBuild normalizes stored paths; the fixed
-# InformationalVersion replaces the default build timestamp so repeated packs
-# of the same commit produce identical package metadata.
+# ContinuousIntegrationBuild normalizes stored paths,
+# and the fixed InformationalVersion replaces the default build timestamp,
+# so repeated packs of the same commit produce identical package metadata.
 dotnet pack "$root/StockSharp.slnx" \
 	--configuration Release \
 	--output "$out" \

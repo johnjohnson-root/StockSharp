@@ -2,21 +2,23 @@
   <!--
     Fork-branded NuGet packaging (imported for every project via common_meta.props).
 
-    Package IDs are distinct from upstream's so downstream projects can depend on
-    this Apache-2.0 fork instead of upstream's post-2026-07-16 (EULA) packages,
-    and so pushes never collide with upstream's reserved "StockSharp.*" prefix on
-    nuget.org. Assembly names, namespaces and file layout are UNCHANGED
-    (StockSharp.*), so the packages are drop-in: only the PackageReference id in
-    consuming projects differs.
+    Package IDs are distinct from upstream's,
+    so downstream projects depend on this Apache-2.0 fork
+    in place of upstream's post-2026-07-16 (EULA) packages,
+    and pushes stay clear of upstream's reserved "StockSharp.*" prefix on nuget.org.
+    Assembly names, namespaces and file layout stay StockSharp.*,
+    so the packages are drop-in:
+    the PackageReference id in consuming projects is the single difference.
 
-    The default prefix "SSharp" (after the platform's own "S#" short name) is a
-    deliberate placeholder decision - rebrand any time with:
+    The default prefix "SSharp" (after the platform's own "S#" short name)
+    is a deliberate placeholder decision.
+    Rebrand any time with:
 
       dotnet pack StockSharp.slnx -c Release -p:ForkPackagePrefix=YourBrand
 
-    Versioning: ForkPackageVersion tracks the assembly version (5.0.0, the last
-    Apache-2.0 upstream state) and is bumped per fork release, independently of
-    upstream's package feeds.
+    ForkPackageVersion tracks the assembly version
+    (5.0.0, the last Apache-2.0 upstream state)
+    and is bumped per fork release, independently of upstream's package feeds.
   -->
   <PropertyGroup>
     <ForkPackagePrefix Condition="'$(ForkPackagePrefix)' == ''">SSharp</ForkPackagePrefix>
