@@ -1,6 +1,8 @@
 # Algo.Analytics.CSharp
 
-This project contains a set of C# analytics scripts designed for the [StockSharp](https://stocksharp.com/en) trading platform. Each script implements `IAnalyticsScript` and demonstrates how to process historical market data from S# storage and visualize results through charts, heatmaps or grids. The project is delivered as a class library (targeting .NET 6.0) and can be used inside the StockSharp Designer or any custom application that references `StockSharp.Algo.Analytics`.
+This project contains a set of C# analytics scripts designed for the [StockSharp](https://stocksharp.com/en) trading platform.
+Each script implements `IAnalyticsScript` and demonstrates how to process historical market data from S# storage and visualize results through charts, heatmaps or grids.
+The project is delivered as a class library (targeting .NET 6.0) and can be used inside the StockSharp Designer or any custom application that references `StockSharp.Algo.Analytics`.
 
 These examples correspond to the Hydra analytics feature described in the [documentation](https://doc.stocksharp.com/en/topics/hydra/analytics.html).
 
@@ -18,12 +20,15 @@ The project includes several sample scripts illustrating different analytical ta
 - **PriceVolumeScript** – calculates volume distribution by price levels and draws it as a histogram.
 - **TimeVolumeScript** – aggregates traded volume by hour and outputs the information in a sortable grid.
 
-Each script reads candles from `IStorageRegistry` using a specified `IMarketDataDrive`, `StorageFormats` and time frame. The resulting visuals are created through `IAnalyticsPanel` which exposes methods for creating charts, grids, heatmaps and 3‑D plots.
+Each script reads candles from `IStorageRegistry` using a specified `IMarketDataDrive`, `StorageFormats` and time frame.
+The resulting visuals are created through `IAnalyticsPanel`
+which exposes methods for creating charts, grids, heatmaps and 3‑D plots.
 
 ## Usage
 
 1. Load this DLL into your application or the [S# Designer](https://doc.stocksharp.com/en/topics/designer.html) to run individual scripts.
-2. Provide the securities, time range and storage parameters required by each script. The output will be displayed through the analytics panel implementation used (e.g., charts or tables in the Designer).
+2. Provide the securities, time range and storage parameters required by each script.
+   The output will be displayed through the analytics panel implementation used (e.g., charts or tables in the Designer).
 
 
 ## Support

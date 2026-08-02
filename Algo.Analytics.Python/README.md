@@ -1,10 +1,13 @@
 # Algo.Analytics.Python
 
-This folder contains sample analytics scripts for the [StockSharp](https://stocksharp.com/en) trading platform written in **IronPython**. Each script implements the `IAnalyticsScript` interface and can be executed inside StockSharp Designer or any application that supports analytics scripts.
+This folder contains sample analytics scripts for the [StockSharp](https://stocksharp.com/en) trading platform written in **IronPython**.
+Each script implements the `IAnalyticsScript` interface and can be executed inside StockSharp Designer or any application that supports analytics scripts.
 
-These examples illustrate the Hydra analytics feature. See the [Hydra documentation](https://doc.stocksharp.com/en/topics/hydra/analytics.html) for usage details.
+These examples illustrate the Hydra analytics feature.
+See the [Hydra documentation](https://doc.stocksharp.com/en/topics/hydra/analytics.html) for usage details.
 
-The examples demonstrate how to analyse market data and visualize the results using StockSharp API. They can be used as a starting point for developing your own analytics tools or trading algorithms in Python.
+The examples demonstrate how to analyse market data and visualize the results using StockSharp API.
+They can be used as a starting point for developing your own analytics tools or trading algorithms in Python.
 
 ## Requirements
 
@@ -45,7 +48,8 @@ The `common` directory provides a set of helper functions that simplify interact
 Below is a brief description of the provided scripts.
 
 ### `empty_analytics_script.py`
-Template demonstrating the minimal implementation of an analytics script. Use it as a starting point for your own logic.
+Template demonstrating the minimal implementation of an analytics script.
+Use it as a starting point for your own logic.
 
 ### `biggest_candle_script.py`
 Finds the candles with the largest volume and range for each selected security and displays them on separate 3D charts.
@@ -60,7 +64,8 @@ Shows how to draw different series styles (lines and histograms) on charts using
 Calculates the Rate of Change (ROC) indicator for the loaded candles and plots both the candle series and indicator values.
 
 ### `normalize_price_script.py`
-Normalizes closing prices of multiple securities to start from 1, allowing them to be compared on the same chart.
+Normalizes closing prices of multiple securities to start from 1,
+allowing them to be compared on the same chart.
 
 ### `pearson_correlation_script.py`
 Loads closing prices for multiple securities, computes the Pearson correlation matrix using NumPy.NET, and displays the matrix as a heatmap.
@@ -75,6 +80,8 @@ Analyses when the largest trading volume occurs by grouping candles by hour and 
 
 1. Ensure IronPython 3 is available on your `PATH`.
 2. Launch StockSharp Designer or your own host application.
-3. Load any of the `.py` files and execute the script. Most scripts expect candle data to be available in your storage; adjust the date range and security identifiers as needed.
+3. Load any of the `.py` files and execute the script.
+   Most scripts expect candle data to be available in your storage;
+   adjust the date range and security identifiers as needed.
 
 

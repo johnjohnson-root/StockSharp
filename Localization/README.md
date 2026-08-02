@@ -2,7 +2,9 @@
 
 ## Overview
 
-`StockSharp.Localization` provides a flexible and extensible localization system for the entire StockSharp framework. The package contains the default English resources and utilities for switching languages at runtime. It works together with language specific packages located in `Localization.Langs`.
+`StockSharp.Localization` provides a flexible and extensible localization system for the entire StockSharp framework.
+The package contains the default English resources and utilities for switching languages at runtime.
+It works together with language specific packages located in `Localization.Langs`.
 
 ## Features
 
@@ -14,7 +16,9 @@
 
 ## Installation
 
-Add `StockSharp.Localization` as a NuGet package to your project. To include additional languages, reference the corresponding package such as `StockSharp.Localization.ru` or the meta package `StockSharp.Localization.All`.
+Add `StockSharp.Localization` as a NuGet package to your project.
+To include additional languages,
+reference the corresponding package such as `StockSharp.Localization.ru` or the meta package `StockSharp.Localization.All`.
 
 The source generator is included automatically and requires no manual configuration.
 
@@ -43,7 +47,8 @@ To add your own language:
 
 1. Create a `strings.json` file with translations where keys match those in the base project.
 2. Include the JSON in a new `.csproj` referencing `common_lang.props` (see examples in `Localization.Langs`).
-3. Reference the resulting assembly in your application. `LocalizedStrings` will automatically pick it up when available.
+3. Reference the resulting assembly in your application.
+   `LocalizedStrings` will automatically pick it up when available.
 
 Languages can also be loaded dynamically using `AddLanguage(string langCode, Stream stream)` at runtime.
 

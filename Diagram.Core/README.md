@@ -1,14 +1,18 @@
 # Diagram.Core
 
-Diagram.Core provides the fundamental building blocks for StockSharp's visual strategy designer. It contains the classes that allow trading algorithms to be represented as diagrams and executed as regular strategies.
+Diagram.Core provides the fundamental building blocks for StockSharp's visual strategy designer.
+It contains the classes that allow trading algorithms to be represented as diagrams and executed as regular strategies.
 
 ## Overview
 
-- **Diagram Elements and Sockets** — base types such as `DiagramElement` and `DiagramSocket` define nodes and their connection points. Elements can emit and receive values to build complex trading logic.
+- **Diagram Elements and Sockets** — base types such as `DiagramElement` and `DiagramSocket` define nodes and their connection points.
+  Elements can emit and receive values to build complex trading logic.
 - **Composite Elements** — `CompositionDiagramElement` manages nested diagrams and exposes parameters and sockets of child elements.
-- **Strategy Integration** — `DiagramStrategy` runs a diagram as a regular `Strategy`, enabling optimization and backtesting.
+- **Strategy Integration** — `DiagramStrategy` runs a diagram as a regular `Strategy`,
+  enabling optimization and backtesting.
 - **Undo/Redo Support** — interfaces like `IUndoManager` provide transaction based change tracking.
-- **External Code** — the `DiagramExternalAttribute` allows methods to be exposed as diagram elements. A small helper script (`python/designer_extensions.py`) makes this available in Python.
+- **External Code** — the `DiagramExternalAttribute` allows methods to be exposed as diagram elements.
+  A small helper script (`python/designer_extensions.py`) makes this available in Python.
 
 ## Getting Started
 
