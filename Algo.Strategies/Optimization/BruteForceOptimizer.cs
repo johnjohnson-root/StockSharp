@@ -42,7 +42,8 @@ public class BruteForceOptimizer : BaseOptimizer
 	}
 
 	/// <summary>
-	/// Run optimization and yield completed iterations as they finish.
+	/// Runs optimization over <paramref name="strategies"/>,
+	/// yielding each iteration as it finishes rather than in the order it was started.
 	/// </summary>
 	/// <param name="startTime">Date in history for starting the paper trading.</param>
 	/// <param name="stopTime">Date in history to stop the paper trading (date is included).</param>
@@ -68,8 +69,14 @@ public class BruteForceOptimizer : BaseOptimizer
 	}
 
 	/// <summary>
-	/// Run optimization and yield completed iterations as they finish.
+	/// Runs optimization, drawing each iteration from <paramref name="tryGetNext"/>
+	/// and yielding it as it finishes rather than in the order it was started.
 	/// </summary>
+	/// <remarks>
+	/// A single iteration that fails to start costs only itself:
+	/// the worker logs the error, releases the batch slot, and carries on,
+	/// until 100 consecutive failures fault the enumeration.
+	/// </remarks>
 	/// <param name="startTime">Date in history for starting the paper trading.</param>
 	/// <param name="stopTime">Date in history to stop the paper trading (date is included).</param>
 	/// <param name="tryGetNext">Handler to try to get next strategy object.</param>
@@ -99,11 +106,10 @@ public class BruteForceOptimizer : BaseOptimizer
 
 			workers[i] = Task.Run(async () =>
 			{
-				// One poisoned iteration (strategy init/start failure) must cost that
-				// iteration, not the worker and all its remaining iterations: the slot is
-				// returned by TryNextRunAsync's teardown, so the loop can carry on at full
-				// batch capacity. The consecutive-failure cap bounds a tryGetNext that
-				// throws before anything is reserved, which would otherwise spin forever.
+				// One poisoned iteration must cost that iteration, not the worker and all its
+				// remaining ones; TryNextRunAsync's teardown returns the slot, so the loop carries
+				// on at full batch capacity. The cap bounds a tryGetNext that throws before
+				// anything is reserved, which would otherwise spin forever.
 				const int maxConsecutiveFailures = 100;
 				var consecutiveFailures = 0;
 
@@ -135,7 +141,6 @@ public class BruteForceOptimizer : BaseOptimizer
 			}, cancellationToken);
 		}
 
-		// When all workers complete, complete the channel
 		_ = Task.Run(async () =>
 		{
 			try

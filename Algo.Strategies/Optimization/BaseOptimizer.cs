@@ -189,37 +189,36 @@ public abstract class BaseOptimizer : BaseLogReceiver
 	public bool IsPaused => _pauseTcs is not null;
 
 	/// <summary>
-	/// Pause optimization. New iterations won't start until <see cref="Resume"/> is called, and the
-	/// backtests that are already running are suspended so progress halts promptly.
+	/// Pauses optimization: new iterations do not start until <see cref="Resume"/> runs,
+	/// and the backtests already in flight are suspended so progress halts promptly.
 	/// </summary>
 	/// <returns><see cref="Task"/></returns>
 	public async Task Pause()
 	{
-		// CompareExchange returns the previous value; if it was already set we are already paused.
-		// Setting the gate is synchronous, so new iteration starts are blocked immediately; the running
-		// backtests are then suspended below.
+		// A non-null previous value means a pause is already in effect.
 		if (Interlocked.CompareExchange(ref _pauseTcs, new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously), null) is not null)
 			return;
 
-		// A "soft" pause that only blocks new starts would still let the whole in-flight batch run
-		// to completion - and each iteration can take seconds - so suspend the running connectors too.
+		// Blocking new starts alone would still let the whole in-flight batch run to
+		// completion, and each iteration can take seconds, so suspend the running connectors too.
 		await SetConnectorsSuspendedAsync(true);
 	}
 
 	/// <summary>
-	/// Resume paused optimization.
+	/// Resumes paused optimization.
 	/// </summary>
 	/// <returns><see cref="Task"/></returns>
 	public async Task Resume()
 	{
-		// Resume the suspended backtests, then release the gate that blocks new iteration starts.
+		// Order matters: resume the running backtests before letting new iterations start,
+		// or the batch slots stay occupied by connectors that are still suspended.
 		await SetConnectorsSuspendedAsync(false);
 		UnblockPauseWaiters();
 	}
 
-	// Releases the gate that parks new iteration starts in TryNextRunAsync without touching the running
-	// connectors. Used by the teardown paths (cancellation/dispose), which run synchronously and only
-	// need the paused waiters to wake up so they can observe cancellation.
+	// Releases the gate that parks new iteration starts in TryNextRunAsync, leaving the running
+	// connectors alone: the synchronous teardown paths only need paused waiters to wake and
+	// observe cancellation.
 	private void UnblockPauseWaiters()
 		=> Interlocked.Exchange(ref _pauseTcs, null)?.TrySetResult();
 
@@ -233,12 +232,10 @@ public abstract class BaseOptimizer : BaseLogReceiver
 		if (connectors.Length == 0)
 			return;
 
-		// Suspend/resume the running backtests by awaiting each connector's own SuspendAsync/StartAsync -
-		// the same mechanism a single backtest uses. It is driven through the async call chain (the UI
-		// button handler is async too) instead of a fire-and-forget Task.Run: that previous approach put
-		// the suspend on the thread pool which - already saturated by the BatchSize (CPU*2) in-flight
-		// backtests - queued it behind them, so the whole batch ran to completion before the pause took
-		// effect. All connectors are handled concurrently so the batch halts at once.
+		// Await each connector's own SuspendAsync/StartAsync on the caller's async chain, never on a
+		// fire-and-forget Task.Run: the pool is already saturated by the BatchSize (CPU*2) in-flight
+		// backtests, so a queued suspend only runs once the whole batch has finished.
+		// All connectors are handled concurrently, so the batch halts at once.
 		async Task ApplyAsync(HistoryEmulationConnector connector)
 		{
 			try
@@ -279,7 +276,8 @@ public abstract class BaseOptimizer : BaseLogReceiver
 	public event Action<Connector> ConnectorInitialized;
 
 	/// <summary>
-	/// Initialize channel, batch manager, and linked CTS for RunAsync.
+	/// Initializes the results channel, the batch manager,
+	/// and the linked cancellation source a run is driven by.
 	/// </summary>
 	/// <param name="totalIterations">Total number of iterations (or int.MaxValue if unknown).</param>
 	/// <param name="cancellationToken">External cancellation token.</param>
@@ -288,7 +286,7 @@ public abstract class BaseOptimizer : BaseLogReceiver
 		_cancelEmulation = false;
 		_allIterationsStarted = false;
 
-		// Reset pause state (no running connectors yet at init, so just clear the start gate).
+		// No connectors are running yet, so clearing the start gate is the whole pause reset.
 		UnblockPauseWaiters();
 
 		_batchManager.Reset(EmulationSettings.BatchSize, totalIterations);
@@ -305,8 +303,8 @@ public abstract class BaseOptimizer : BaseLogReceiver
 		{
 			_cancelEmulation = true;
 
-			// Unblock paused waiters so they can see cancellation (the connectors are disconnected just
-			// below, so there is no need to resume their replay).
+			// Wake paused waiters so they observe cancellation; the connectors are disconnected
+			// just below, so their replay does not need resuming first.
 			UnblockPauseWaiters();
 
 			using (_sync.EnterScope())
@@ -334,7 +332,8 @@ public abstract class BaseOptimizer : BaseLogReceiver
 	}
 
 	/// <summary>
-	/// Yield results from channel reader.
+	/// Yields each completed iteration as it is written to the results channel,
+	/// ending when <see cref="CompleteChannel"/> closes the channel.
 	/// </summary>
 	protected async IAsyncEnumerable<(Strategy Strategy, IStrategyParam[] Parameters)> ReadResultsAsync(
 		[EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -363,7 +362,7 @@ public abstract class BaseOptimizer : BaseLogReceiver
 	}
 
 	/// <summary>
-	/// Complete the channel so RunAsync enumeration ends.
+	/// Completes the results channel, so a RunAsync enumeration ends.
 	/// </summary>
 	protected void CompleteChannel()
 	{
@@ -371,9 +370,13 @@ public abstract class BaseOptimizer : BaseLogReceiver
 	}
 
 	/// <summary>
-	/// Try start next iteration. Returns <see langword="true"/> if iteration was started and completed,
-	/// <see langword="false"/> if no more iterations available.
+	/// Reserves a batch slot and runs the next iteration to completion,
+	/// returning <see langword="false"/> once no further iteration is available to start.
 	/// </summary>
+	/// <remarks>
+	/// The slot is released exactly once, either by the connector's Stopped transition
+	/// or by this method's own teardown, whichever gets there first.
+	/// </remarks>
 	/// <param name="startTime">Date in history for starting the paper trading.</param>
 	/// <param name="stopTime">Date in history to stop the paper trading (date is included).</param>
 	/// <param name="tryGetNext">Handler to try to get next strategy object.</param>
@@ -388,7 +391,6 @@ public abstract class BaseOptimizer : BaseLogReceiver
 		if (tryGetNext is null)
 			throw new ArgumentNullException(nameof(tryGetNext));
 
-		// Wait if paused
 		var pauseTcs = _pauseTcs;
 		if (pauseTcs is not null)
 			await pauseTcs.Task.WaitAsync(cancellationToken);
@@ -414,7 +416,6 @@ public abstract class BaseOptimizer : BaseLogReceiver
 				return false;
 			}
 
-			// Try to get next strategy
 			pfProvider = new CopyPortfolioProvider(PortfolioProvider);
 			var next = tryGetNext(pfProvider);
 
@@ -429,7 +430,7 @@ public abstract class BaseOptimizer : BaseLogReceiver
 
 			(strategy, parameters) = next.Value;
 
-			// Reserve slot in batch
+			// CanStartNext was checked above under this same lock, so the reservation cannot fail here.
 			if (!_batchManager.TryReserveSlot(out iterationId))
 			{
 				pfProvider.Dispose();
@@ -451,19 +452,16 @@ public abstract class BaseOptimizer : BaseLogReceiver
 		{
 			await StartIterationAsync(connector, strategy, parameters, cancellationToken);
 
-			// Honour cancellation while parked on the iteration: the completion tcs is set
-			// from the connector's Stopped transition, and the cancel sweep in
-			// InitializeRunAsync can miss a connector that had not started when the token
-			// fired - without the token this await could park the worker forever.
+			// The completion tcs is set from the connector's Stopped transition, and the cancel
+			// sweep in InitializeRunAsync can miss a connector that had not started when the
+			// token fired; without the token here, the worker could park forever.
 			return await tcs.Task.WaitAsync(cancellationToken);
 		}
 		finally
 		{
-			// The worker owns its iteration's teardown. Disposing the connector releases
-			// the whole emulation graph (replay task, suspend gate, adapters) even on the
-			// paths where nobody else stops it - the fix for the post-run test-host hang
-			// tracked in KNOWN-ISSUES.md. On the success path the iteration has already
-			// completed, so this is only object cleanup.
+			// The worker owns its iteration's teardown: disposing the connector releases the whole
+			// emulation graph (replay task, suspend gate, adapters) even on the paths where nobody
+			// else stops it — the post-run test-host hang tracked in KNOWN-ISSUES.md.
 			using (_sync.EnterScope())
 				_startedConnectors.Remove(connector);
 
@@ -472,12 +470,9 @@ public abstract class BaseOptimizer : BaseLogReceiver
 
 			if (completionGate.TryEnter())
 			{
-				// The iteration never completed naturally (StartIterationAsync failed, or
-				// cancellation hit while the connector had not reached Stopped and the
-				// cancel sweep could not see it). Return the reserved slot so the batch
-				// keeps full capacity - a stale reservation makes surviving workers treat
-				// the batch as exhausted and silently abandon remaining iterations - and
-				// keep the cancel-drain completion contract intact.
+				// The iteration never completed naturally, so return its reserved slot here:
+				// a stale reservation makes surviving workers treat the batch as exhausted
+				// and silently abandon the remaining iterations.
 				bool isFinished;
 
 				using (_sync.EnterScope())
@@ -530,10 +525,9 @@ public abstract class BaseOptimizer : BaseLogReceiver
 		return connector;
 	}
 
-	// Single-entry latch shared by an iteration's two possible finalizers: the
-	// connector's Stopped transition (natural completion) and the worker's unwind
-	// in TryNextRunAsync (startup failure or cancellation). CompleteIteration
-	// throws on a duplicate id, so exactly one of them may release the slot.
+	// Single-entry latch shared by an iteration's two possible finalizers: the connector's
+	// Stopped transition and the worker's unwind in TryNextRunAsync. CompleteIteration throws
+	// on an id that is no longer running, so exactly one of them may release the slot.
 	private sealed class IterationCompletionGate
 	{
 		private int _entered;
@@ -558,10 +552,8 @@ public abstract class BaseOptimizer : BaseLogReceiver
 			if (state != ChannelStates.Stopped)
 				return;
 
-			// Loses only against the worker's unwind in TryNextRunAsync (which then
-			// owns the slot release) or a duplicate Stopped transition; completing
-			// here after either would double-release the slot and report a result
-			// for a torn-down iteration.
+			// Completing here after the worker's unwind, or after a duplicate Stopped transition,
+			// would double-release the slot and report a result for a torn-down iteration.
 			if (!completionGate.TryEnter())
 				return;
 
@@ -592,13 +584,10 @@ public abstract class BaseOptimizer : BaseLogReceiver
 			isFinished = _allIterationsStarted && _batchManager.IsFinished;
 		}
 
-		// Write result to channel (for RunAsync consumers)
 		_resultsChannel?.Writer.TryWrite((strategy, parameters));
 
-		// Signal iteration completed
 		tcs.TrySetResult(true);
 
-		// Check if we should complete
 		if (isFinished || (_cancelEmulation && _batchManager.RunningCount == 0))
 			CompleteChannel();
 	}

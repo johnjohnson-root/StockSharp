@@ -7,7 +7,7 @@ using Nito.AsyncEx;
 using StockSharp.Algo.Testing.Generation;
 
 /// <summary>
-/// The adapter, receiving messages form the storage <see cref="IStorageRegistry"/>.
+/// The adapter, receiving messages from the storage <see cref="IStorageRegistry"/>.
 /// </summary>
 public class HistoryMessageAdapter : MessageAdapter, IEmulationMessageAdapter
 {
@@ -15,11 +15,10 @@ public class HistoryMessageAdapter : MessageAdapter, IEmulationMessageAdapter
 
 	private CancellationTokenSource _cancellationTokenSource;
 
-	// Gate that pauses the historical replay loop while the emulation is suspended.
-	// Open by default; closed on Suspending and reopened on Starting (resume).
-	// Async (not ManualResetEventSlim): a suspended replay must not pin a thread-pool
-	// thread in a synchronous wait — with a batch of parallel backtests suspended
-	// (optimizer pause) those blocked threads can starve the pool on small CI runners.
+	// Gate that pauses the historical replay loop while the emulation is suspended:
+	// open by default, closed on Suspending, reopened on Starting. It must stay async —
+	// an optimizer pause suspends a whole batch of replays at once, and blocking each of
+	// them in a synchronous wait starves the thread pool on small CI runners.
 	private readonly AsyncManualResetEvent _processingGate = new(true);
 
 	/// <summary>
@@ -250,8 +249,7 @@ public class HistoryMessageAdapter : MessageAdapter, IEmulationMessageAdapter
 				{
 					case ChannelStates.Starting:
 					{
-						// Resume the replay loop. No-op on the initial start (the gate is already open),
-						// reopens it when resuming from a suspended state.
+						// Reopen the gate; a no-op on the initial start, where it is already open.
 						_processingGate.Set();
 
 						if (!_marketDataManager.IsStarted)
@@ -300,8 +298,8 @@ public class HistoryMessageAdapter : MessageAdapter, IEmulationMessageAdapter
 					_marketDataManager.UnregisterGenerator(generatorMsg.OriginalTransactionId);
 				}
 
-				// Registering/unregistering a generator changes a security's supported data types, so drop the
-				// cached query results — otherwise GetSupportedMarketDataTypesAsync keeps returning the stale set.
+				// A generator change alters the security's supported data types, so the cached
+				// query results must go; GetSupportedMarketDataTypesAsync would serve a stale set.
 				_supportedMarketDataTypes.Clear();
 
 				break;
@@ -358,8 +356,8 @@ public class HistoryMessageAdapter : MessageAdapter, IEmulationMessageAdapter
 			{
 				await foreach (var message in _marketDataManager.StartAsync(boards).WithCancellation(token))
 				{
-					// Wait here while the emulation is suspended; the replay is lazy, so not pulling
-					// the next message also halts data generation - no backlog builds up.
+					// Wait here while the emulation is suspended. The replay is lazy, so parking
+					// before the next pull also halts data generation and no backlog builds up.
 					await _processingGate.WaitAsync(token);
 
 					await SendOutMessageAsync(message, token);

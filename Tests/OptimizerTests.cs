@@ -26,7 +26,8 @@ public class OptimizerTests : BaseTestClass
 	}
 
 	/// <summary>
-	/// Creates a list of SMA strategy parameter combinations for optimization.
+	/// Yields the SMA strategy parameter combinations to optimize over,
+	/// skipping every pair whose short period is not below its long period.
 	/// </summary>
 	private static IEnumerable<(Strategy strategy, IStrategyParam[] parameters)> CreateStrategyIterations(
 		Security security, Portfolio portfolio, int shortFrom, int shortTo, int shortStep, int longFrom, int longTo, int longStep)
@@ -284,7 +285,6 @@ public class OptimizerTests : BaseTestClass
 		var startTime = Paths.HistoryBeginDate;
 		var stopTime = Paths.HistoryBeginDate.AddDays(6);
 
-		// Create strategies for both securities
 		var strategies = new List<(Strategy strategy, IStrategyParam[] parameters)>();
 
 		foreach (var security in new[] { security1, security2 })
@@ -351,7 +351,7 @@ public class OptimizerTests : BaseTestClass
 			var statisticManager = strategy.StatisticManager;
 			statisticManager.AssertNotNull("StatisticManager should not be null");
 
-			// The SMA strategy trades over the history, so statistics must reflect real activity, not just exist.
+			// The SMA strategy trades over this history, so the statistics must reflect real activity.
 			IsTrue(strategy.Orders.Any(), "Strategy should have placed orders during the backtest");
 			IsTrue(strategy.MyTrades.Any() || strategy.PnL != 0, "Strategy should have trades or non-zero PnL");
 		}
@@ -417,7 +417,6 @@ public class OptimizerTests : BaseTestClass
 
 		optimizer.StrategyInitialized += (strategy, parameters) =>
 		{
-			// Subscribe to strategy events to check time ordering within each iteration
 			DateTime? lastEventTime = null;
 			var strategyErrors = new List<string>();
 
@@ -450,7 +449,6 @@ public class OptimizerTests : BaseTestClass
 				lastEventTime = time;
 			};
 
-			// When strategy stops, collect errors
 			strategy.ProcessStateChanged += (s) =>
 			{
 				if (s.ProcessState == ProcessStates.Stopped && strategyErrors.Count > 0)
@@ -468,7 +466,6 @@ public class OptimizerTests : BaseTestClass
 		{
 		}
 
-		// Report any time errors
 		if (iterationTimeErrors.Count > 0)
 		{
 			Fail($"Time ordering violations within strategy iterations:\n{iterationTimeErrors.Take(20).JoinN()}");
@@ -607,7 +604,7 @@ public class OptimizerTests : BaseTestClass
 		var shortParam = strategy.Parameters[nameof(SmaStrategy.Short)];
 		var longParam = strategy.Parameters[nameof(SmaStrategy.Long)];
 
-		// Many iterations so we can stop mid-run
+		// Many iterations, so the run can be stopped mid-way.
 		optimizer.EmulationSettings.MaxIterations = 100;
 
 		var geneticParams = new (IStrategyParam param, object from, object to, object step, IEnumerable values)[]
@@ -702,7 +699,7 @@ public class OptimizerTests : BaseTestClass
 		var strategies = CreateStrategyIterations(security, portfolio, 10, 40, 5, 50, 100, 5).ToList();
 
 		using var cts = CancellationTokenSource.CreateLinkedTokenSource(CancellationToken);
-		cts.CancelAfter(TimeSpan.FromSeconds(30)); // cancel after 30 sec
+		cts.CancelAfter(TimeSpan.FromSeconds(30));
 
 		var count = 0;
 
@@ -722,12 +719,13 @@ public class OptimizerTests : BaseTestClass
 	}
 
 	/// <summary>
-	/// Tests that a single failing iteration costs only that iteration: the worker
-	/// survives and the failed iteration's batch slot is released, so all remaining
-	/// iterations still run. Regression test for the stale-reservation defect where
-	/// a startup failure leaked the slot and the worker treated the batch as
-	/// exhausted, silently abandoning the rest of the run.
+	/// Tests that a single failing iteration costs only that iteration:
+	/// the worker survives, its batch slot is released, and every remaining iteration still runs.
 	/// </summary>
+	/// <remarks>
+	/// Regression guard for the stale reservation that made a surviving worker treat the batch
+	/// as exhausted and silently abandon the rest of the run.
+	/// </remarks>
 	[TestMethod]
 	public async Task BruteForceRunAsyncSurvivesIterationStartFailure()
 	{
@@ -740,8 +738,8 @@ public class OptimizerTests : BaseTestClass
 
 		using var optimizer = new BruteForceOptimizer(secProvider, pfProvider, storageRegistry);
 
-		// Single worker makes the regression sharp: with a leaked slot (or a dead
-		// worker) nothing after the poisoned iteration would run at all.
+		// A single worker makes the regression sharp: with a leaked slot, or a dead worker,
+		// nothing after the poisoned iteration would run at all.
 		optimizer.EmulationSettings.BatchSize = 1;
 
 		var startTime = Paths.HistoryBeginDate;
@@ -750,8 +748,7 @@ public class OptimizerTests : BaseTestClass
 		var strategies = CreateStrategyIterations(security, portfolio, 20, 30, 10, 60, 80, 20).ToList();
 		IsTrue(strategies.Count >= 3, "Need at least 3 iterations so the failure sits mid-run");
 
-		// Poison a middle iteration so surviving both the failure and the slot loss
-		// is observable on both sides of it.
+		// Poison a middle iteration, so survival is observable on both sides of it.
 		var poisoned = strategies[1].strategy;
 
 		optimizer.StrategyInitialized += (strategy, parameters) =>
@@ -773,10 +770,12 @@ public class OptimizerTests : BaseTestClass
 	}
 
 	/// <summary>
-	/// Tests that a token already cancelled before the run starts terminates the
-	/// enumeration promptly with no completed iterations and no hang. Regression
-	/// guard for reserved slots being released on the cancellation path.
+	/// Tests that a token already cancelled before the run starts
+	/// terminates the enumeration with no completed iterations and no hang.
 	/// </summary>
+	/// <remarks>
+	/// Regression guard for reserved slots being released on the cancellation path.
+	/// </remarks>
 	[TestMethod]
 	public async Task BruteForceRunAsyncCancelledBeforeStart()
 	{
