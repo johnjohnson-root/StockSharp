@@ -83,9 +83,12 @@ and `Directory.Build.targets` overrides every one with an exact version through 
 Twenty `Ecng.*` ids carry a pin.
 Seven more arrive transitively and land in the restore closure all the same,
 which makes 27 packages the fork must own before the layer is its own.
-The offline mirror in `nuget-mirror/` holds 26 of them;
-`Ecng.Interop` is absent because its only consumer is a sample,
-and samples sit outside both solutions.
+The offline mirror in `nuget-mirror/` holds all 27.
+`Ecng.Interop` reaches it through the samples solution:
+its only consumer is `Samples/07_Testing/04_HistoryConsole`,
+so `tools/mirror-packages.sh` restores `StockSharp_Samples.slnx`
+beside the library and test solutions for exactly that reason,
+and the mirror it produces carries 144 packages in all.
 
 | package | version | pin | types | members | class | projects |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -217,8 +220,10 @@ Public exposure: none.
 
 The widest package in the closure carries the thinnest consumption:
 one call opening a report file at `Samples/07_Testing/04_HistoryConsole/Program.cs`.
-The package stays out of the offline mirror,
-because no project in either solution touches it.
+That single call is why `tools/mirror-packages.sh` restores the samples
+solution as well as the library and test ones:
+no project in either of those two touches the package,
+so a mirror built from them alone would omit a pinned id.
 
 ### Ecng.Localization
 
