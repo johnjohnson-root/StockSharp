@@ -30,11 +30,15 @@ out="${1:-$root/nuget-mirror}"
 cache="$(mktemp -d)"
 trap 'rm -rf "$cache"' EXIT
 
-# Restore both solutions into a fresh, private package folder,
+# Restore all three solutions into a fresh, private package folder,
 # so the copy step below sees the complete closure
 # that a warm global cache would hide.
+# The samples solution contributes packages the library solutions never
+# reach (Ecng.Interop, StockSharp.Samples.HistoryData - see
+# docs/ecng-surface.md), so skipping it leaves the mirror incomplete.
 dotnet restore "$root/StockSharp.slnx" --packages "$cache"
 dotnet restore "$root/StockSharp_Tests.slnx" --packages "$cache"
+dotnet restore "$root/StockSharp_Samples.slnx" --packages "$cache"
 
 # Point every project's obj/ assets back at the regular package folder.
 # The restores above aimed those assets at the temporary folder deleted on exit,
@@ -44,6 +48,7 @@ dotnet restore "$root/StockSharp_Tests.slnx" --packages "$cache"
 restore_assets() {
 	dotnet restore "$root/StockSharp.slnx"
 	dotnet restore "$root/StockSharp_Tests.slnx"
+	dotnet restore "$root/StockSharp_Samples.slnx"
 }
 trap 'restore_assets; rm -rf "$cache"' EXIT
 

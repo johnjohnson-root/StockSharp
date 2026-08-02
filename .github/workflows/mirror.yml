@@ -37,6 +37,7 @@ jobs:
         # wherever a remote source reaches this restore later.
         run: |
           dotnet restore StockSharp_Tests.slnx --source ./nuget-mirror --no-http-cache --packages "$RUNNER_TEMP/verify-pkgs"
+          dotnet restore StockSharp_Samples.slnx --source ./nuget-mirror --no-http-cache --packages "$RUNNER_TEMP/verify-pkgs"
 
       - name: Upload mirror artifact
         uses: actions/upload-artifact@v4
