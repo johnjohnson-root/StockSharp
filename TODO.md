@@ -1,0 +1,468 @@
+# TODO
+
+This file is the fork's work inventory,
+written for an agent to execute one item at a time.
+Each item stands alone:
+its context, its steps, its verification, and its finish line.
+`KNOWN-ISSUES.md` carries the defect history behind several items,
+and `.claude/skills/` carries the prose rules every change follows.
+
+## Working an item
+
+1. Read the item's `Blocked by` line.
+   A decision id there means the owner has not chosen yet;
+   work something else.
+2. Implement on the session's designated branch,
+   following `illi-voice` for every prose surface
+   and `illi-voice-csharp` for C# comments.
+3. Run the item's `Verify` commands and the standard gate below.
+4. Commit per the `illi-voice` commit rules,
+   push, and let CI confirm across the 3-OS matrix.
+
+The standard gate for any code change:
+
+    dotnet build StockSharp_Tests.slnx -c Release
+    dotnet test StockSharp_Tests.slnx --no-build -c Release \
+      --filter 'FullyQualifiedName!~PythonAnalyticsScripts'
+
+4458 pass, 0 fail, 11 documented skips, prompt test-host exit.
+A new test earns its place by failing on the unfixed code:
+stash the fix, build, watch the test fail, pop the stash.
+
+## Decisions the owner makes
+
+Work gated on a decision waits for it.
+Record each answer as a numbered decision record under `docs/decisions/`
+(T16 creates the directory and the template).
+
+### D1. Ecng dependency strategy — open
+
+`Ecng.*` and `StockSharp.Samples.HistoryData` are pinned pre-relicense
+binaries published by the upstream owner.
+Pinning plus the mirror (see `nuget-mirror/README.md`) removes the
+availability risk and leaves the evolution risk:
+that layer takes no fixes, no CVE patches, and no API growth, ever.
+The Foundation collections (`Foundation/Collections/`) already began
+clean-room replacement with contract tests.
+
+- **Clean-room replace** (recommended): continue the Foundation program
+  surface-by-surface until the pins reach zero. Slowest; cleanest provenance.
+- **Vendor last permissive source**: import the pre-relicense Ecng sources
+  as projects after a license check, dropping the binary pins at once.
+- **Hybrid**: vendor now, rewrite opportunistically.
+- **Stay pinned**: accept the frozen layer; the mirror is the safety net.
+
+Unblocks T2 and T3; T1 and T4 proceed under every answer.
+
+### D2. Package publishing — open
+
+`Pack` builds all 59 `SSharp.*` packages as CI artifacts and nothing
+publishes them.
+The `SSharp` prefix itself is a placeholder
+(`-p:ForkPackagePrefix=...` renames it in one property).
+
+- **Artifacts only** (recommended): defer until an external consumer exists.
+- **nuget.org**: reserve the prefix, add a tag-driven release workflow (T5).
+- **GitHub Packages**: distribution without public namespace; token required.
+
+Unblocks T5. Also answer: keep `SSharp`, or rename to what?
+
+### D3. Samples fate — open
+
+`Samples/**` references upstream StockSharp NuGet binaries,
+sits outside both solutions, and cannot build against this fork.
+
+- **Rewire to project references** (recommended): samples become living
+  documentation that breaks loudly when the API changes (T9).
+- **Keep as docs only**: zero cost; silent rot as the fork diverges.
+- **Drop the tree**: smallest repo; loses the onboarding ramp.
+
+Unblocks T9.
+
+### D4. Divergence policy — open
+
+Today a consumer switches from upstream by changing package ids alone:
+assembly names, namespaces, and public API stay `StockSharp.*`-compatible.
+
+- **Compatible maintenance** (recommended): hold that contract; ship fixes,
+  hardening, and internal rewrites only.
+- **Compat now, diverge at 2.0**: collect desired breaks in decision
+  records; break once, deliberately, at a declared major version.
+- **Active divergence**: refactor freely, one decision record per break.
+
+Sets the latitude for T14, T15, and every future refactor.
+
+### D5. Watchdog threshold — open, low stakes
+
+`Tests/AsmInit.cs` arms a 3-minute post-cleanup watchdog (exit 97).
+Keep 3 minutes, or change it — one constant.
+
+## Dependency sovereignty
+
+### T1. Inventory the consumed Ecng API surface
+
+Blocked by: nothing. Useful under every D1 answer.
+
+The fork consumes Ecng through `global using` directives and
+`Directory.Build.targets` pins, and nobody has measured the surface.
+
+1. List the pinned packages and versions from `Directory.Build.targets`.
+2. For each referencing project, extract every `Ecng.*` type and member
+   the compiled IL actually uses
+   (drive `System.Reflection.Metadata` over the Release assemblies,
+   or start from `grep -r "Ecng\." --include='*.cs'` and refine).
+3. Write `docs/ecng-surface.md`: one section per package,
+   member list, referencing projects, and a rough size class
+   (trivial / moderate / heavy) for replacement.
+4. Rank packages by fan-in so the smallest real dependency goes first.
+
+Verify: the document names every pinned package,
+and a spot-check of three listed members finds each in the source.
+Done when the ranking exists and D1 can be argued from data.
+
+### T2. Replace the next Ecng surface clean-room
+
+Blocked by: D1 = clean-room or hybrid. Repeatable; one surface per pass.
+
+Follow the Foundation pattern end to end:
+
+1. Pick the top-ranked package from `docs/ecng-surface.md`.
+2. Write contract tests against the current binary's observed behavior
+   first (`Tests/FoundationExtensionContractTests.cs` is the template —
+   assert semantics, not implementation).
+3. Implement replacements under `Foundation/` (or a sibling project named
+   for the domain), `StockSharp.*` namespaces, no source copied.
+4. Migrate consumers project-by-project; each migration compiles and
+   passes the standard gate before the next begins.
+5. When a package's fan-in reaches zero, proceed to T3 for it.
+
+Verify: contract tests pass against the replacement,
+the standard gate is green,
+and `grep -r "<replaced namespace>" --include='*.cs'` finds no consumer.
+
+### T3. Drop a pin whose surface reached zero
+
+Blocked by: a completed T2 pass (or D1 = vendor, applied per package).
+
+1. Remove the package's pin from `Directory.Build.targets`.
+2. Run `tools/mirror-packages.sh` so the mirror matches the new closure.
+3. Verify offline restore:
+   restore both solutions with `--source ./nuget-mirror --no-http-cache`
+   into a fresh `--packages` folder.
+4. Update `docs/ecng-surface.md` and, where present, the count in
+   `README.md`'s pinning section.
+
+Verify: standard gate green; offline restore succeeds; mirror artifact
+in CI ("Mirror packages" workflow) uploads without error.
+
+### T4. Watch the pinned packages for advisories
+
+Blocked by: nothing. Pinned packages take no patches, so watching is
+the only mitigation while any pin remains.
+
+1. Add a scheduled workflow (weekly) running
+   `dotnet list StockSharp_Tests.slnx package --vulnerable --include-transitive`
+   against the pinned graph.
+2. Fail the run on any hit, so the repo owner gets a notification
+   naming the package and advisory.
+3. Document the response path in the workflow header comment:
+   an advisory against a pinned package forces the D1 conversation
+   for that package immediately.
+
+Verify: dispatch the workflow manually once; it completes green today.
+
+## Packaging and release
+
+### T5. Tag-driven release workflow
+
+Blocked by: D2 = nuget.org or GitHub Packages.
+
+1. On tag `v*`: build, pack with `-p:ForkPackageVersion=<tag>`,
+   run the standard gate, publish to the chosen feed, attach the
+   packages and the mirror artifact to a GitHub Release.
+2. Route the feed credential through a repository secret;
+   route the tag value through env, never template interpolation
+   (the `pack.yml` header records why).
+3. Seed `CHANGELOG.md` (T18) and cut the entry as part of the release.
+
+Verify: a `v0.0.1-rc.1` tag on a scratch run publishes to the feed
+and the standard gate ran before publish.
+
+### T6. Run the mirror workflow once and stash the artifact
+
+Blocked by: nothing. The recovery path exists and nobody has exercised
+it end to end in CI.
+
+1. Dispatch "Mirror packages" on `master`.
+2. Confirm the offline-restore verification step passed in the log.
+3. Download the `nuget-mirror` artifact and store it somewhere durable
+   outside GitHub's 90-day artifact window —
+   attaching it to a draft GitHub Release named `mirror-<date>` suffices
+   and keeps it in-repo.
+
+Done when a durable copy exists and its location is named in
+`nuget-mirror/README.md`.
+
+### T7. Lock the restore graph
+
+Blocked by: nothing.
+
+`Directory.Build.targets` pins direct versions; the transitive closure
+still floats within constraints.
+
+1. Set `RestorePackagesWithLockFile=true` in `Directory.Build.props`.
+2. Commit every generated `packages.lock.json`.
+3. Add `--locked-mode` to the CI restore
+   so drift fails the build instead of passing silently.
+4. Re-run `tools/mirror-packages.sh`; confirm the closure count.
+
+Verify: standard gate green; a deliberate version bump of one package
+without lock regeneration fails CI in locked mode (then revert it).
+
+### T8. Pin the SDK with global.json
+
+Blocked by: nothing.
+
+1. Add `global.json` at the root:
+   the `10.0.x` SDK version CI resolves today, `rollForward: latestPatch`.
+2. Match the `setup-dotnet` versions in all three workflows.
+
+Verify: `dotnet --version` under the repo root reports the pinned line;
+standard gate green; CI green on all three OSes.
+
+## Samples
+
+### T9. Rewire Samples to project references
+
+Blocked by: D3 = rewire.
+
+1. Inventory every `Samples/**/*.csproj` package reference to
+   `StockSharp.*` upstream ids.
+2. Replace each with a `ProjectReference` to the fork project of the
+   same name; leave third-party package references alone.
+3. Add `StockSharp_Samples.slnx` covering the whole tree,
+   excluding any sample that requires a proprietary connector
+   (list those in the solution-adjacent README instead).
+4. Add a CI leg that builds the samples solution on ubuntu only —
+   compile-checking documentation needs one OS.
+5. WPF-dependent samples build on windows or not at all:
+   mark them `EnableWindowsTargeting` or exclude them explicitly
+   with a comment naming the reason.
+
+Verify: `dotnet build StockSharp_Samples.slnx -c Release` green locally
+and in the new CI leg; `git grep -l 'PackageReference.*StockSharp\.'
+Samples/` returns nothing.
+
+## Correctness and tests
+
+### T10. Bring GeneticOptimizer to BruteForce's failure semantics
+
+Blocked by: nothing.
+
+`BruteForceOptimizer` workers survive a poisoned iteration, release the
+slot, and cap consecutive failures (commits `f98b0df`, `9b57476`).
+The genetic path awaits `TryNextRunAsync` inside a GeneticSharp fitness
+evaluation and propagates every exception into the GA loop.
+
+1. Read `GeneticOptimizer.cs` end to end;
+   map what GeneticSharp does with a throwing fitness function
+   (termination? silent chromosome death?) and what `CompleteChannel()`
+   at line ~462 covers.
+2. Decide and implement the parallel behavior:
+   a failed fitness evaluation scores the chromosome worthless
+   (`double.MinValue`, as the iteration-limit path already does)
+   rather than killing the run, with the error logged.
+3. Regression tests mirroring the BruteForce ones:
+   poisoned `StrategyInitialized` for one parameter set — the run
+   completes and other chromosomes evaluate;
+   pre-cancelled token — clean termination, zero results.
+4. Prove each test bites: stash the fix, watch it fail, pop.
+
+Verify: `--filter 'FullyQualifiedName~GeneticOptimizer|FullyQualifiedName~OptimizerTests'`
+green; new tests stable over 4 consecutive runs; standard gate green.
+
+### T11. Reconcile the two finish predicates
+
+Blocked by: nothing. Small.
+
+`BaseOptimizer.CheckFinished` completes the channel on
+`_batchManager.IsFinished` alone;
+`OnIterationCompleted` requires `_allIterationsStarted && IsFinished`.
+Either prove the weaker predicate safe on every `CheckFinished` call
+site (each site sets `_allIterationsStarted` first — write that proof
+into a comment) or align both to the conjunction.
+
+Verify: reasoning recorded at `CheckFinished`;
+optimizer suites green; standard gate green.
+
+### T12. Burn down the flaky tail
+
+Blocked by: nothing. One test per pass; the playbook is proven.
+
+The documented tail (`KNOWN-ISSUES.md`, "Flaky-test tail"):
+`CandleTests.TotalPrice` ("Sequence contains more than one element"),
+`Subscriptions_RepeatedRounds_AllProcessed` (windows, ~1 min),
+`Connection_SubscriptionsCleanedOnDisconnect` (15 s timeout, seen on
+macos 2026-08-02).
+
+For each test, in its own commit:
+
+1. Reproduce or reason the race from the test source:
+   the two proven classes are unsynchronized collections mutated by a
+   background task (fix: `ConcurrentQueue`, commit `1793143`) and
+   fixed sleeps racing a loaded host (fix: bounded polling, commit
+   `83c6ca2`; `WaitForMessageAsync` in `Tests/HistoryMessageAdapterTests.cs`
+   is the template).
+2. Convert the timing assumption to a polled condition with a generous
+   bound; touch nothing but the test unless the product code is provably
+   at fault.
+3. Loop the test 8 times locally; all pass.
+4. Update the tail list in `KNOWN-ISSUES.md`.
+
+Done when the tail list is empty and CI's retry-once mechanism
+(`dotnet.yml`) records zero retries across five consecutive runs —
+then remove the retry mechanism in its own commit.
+
+### T13. Audit the skips and the Python exclusion
+
+Blocked by: nothing.
+
+1. Enumerate the 11 skipped tests
+   (`dotnet test ... --logger trx`, then read the skip reasons from the
+   trx) and the reason CI filters `PythonAnalyticsScripts` entirely.
+2. For each: re-enable with a fix, or record the precise blocking
+   condition in `KNOWN-ISSUES.md` (missing data file, proprietary
+   dependency, upstream defect — name it).
+3. The Python scripts (`Algo.Analytics.Python/`) run via
+   pythonnet/IronPython inside tests; if the exclusion is
+   environment-only (works locally, breaks on CI), say which environment
+   piece and gate the filter on it instead of excluding wholesale.
+
+Done when every skip and the exclusion carries a written reason a
+future agent can act on, and anything fixable in under a day is fixed.
+
+### T14. Retire the sync-facade shims
+
+Blocked by: D4 (the answer sets how far the API may move).
+
+`KNOWN-ISSUES.md` names the two open items from the async migration:
+`Strategy`'s ordering internals still drive the sync facade
+(pragma-marked), and `AsyncHelper.Run` shims remain in void members
+until callers migrate.
+
+1. `grep -rn 'AsyncHelper.Run' --include='*.cs'` for the shim list and
+   the pragma markers for the ordering internals.
+2. Under compatible maintenance (D4), migrate internal callers to the
+   async members and shrink the shims to the public sync surface alone.
+3. Under a divergence answer, deprecate the sync surface per the policy
+   and record the break in a decision record.
+
+Verify: standard gate green; the KNOWN-ISSUES entry shrinks or closes.
+
+### T15. Fix the two in-tree upstream defects
+
+Blocked by: nothing. Both are documented with repro reasoning in
+`KNOWN-ISSUES.md`; both still exist upstream, so fixing them here is
+pure fork value.
+
+1. The priority-queue comparer race (`KNOWN-ISSUES.md` ~line 120):
+   apply the documented fix approach, with a regression test that
+   fails on the unfixed comparer.
+2. The `.Abs()` on `TimeSpan` overflow pattern (~line 133): same.
+3. Each fix in its own commit with the bite-check performed.
+
+Verify: new tests fail stashed / pass fixed; standard gate green.
+
+## Governance and docs
+
+### T16. Create the decision-record scaffold
+
+Blocked by: nothing; D1–D5 land here as they are answered.
+
+1. Create `docs/decisions/`.
+2. `0001-adopt-semantic-line-breaks.md`: Context (grep-a-whole-thought,
+   one-word-edit-one-line-diff), Decision ("We will…"), Consequences,
+   citing <https://sembr.org/> —
+   `illi-format-sweep` instructs exactly this record.
+3. `0002-adopt-the-house-voice.md`: the `illi-voice` adoption and the
+   two variant skills, with the C# and CJK clash reasoning from the
+   variants' own bodies.
+4. One record per answered decision D1–D5, numbered in answer order,
+   Status field per the `illi-voice` decision-record rules.
+
+Verify: each record follows the illi-voice format
+(sequential number, Status field, forcing-condition Context,
+"We will" Decision, costs-beside-buys Consequences).
+
+### T17. Write CONTRIBUTING.md
+
+Blocked by: nothing.
+
+One page, lifecycle order:
+
+1. Definition: what this fork is (one paragraph; `README.md`'s fork
+   section is the source).
+2. Build and test: the two commands from the standard gate.
+3. Prose rules: point at `.claude/skills/` — voice for wording,
+   format-sweep for line breaks, the variants for C# and CJK.
+4. Commit and PR shape: the illi-voice commit rules,
+   plus the fork's proof conventions
+   (regression tests demonstrate they bite; comment-only changes carry
+   a code-identity check).
+5. The decision-record process (T16) for anything consequential.
+
+Verify: a newcomer reaches a green standard gate following only this
+file; every referenced path exists.
+
+### T18. Seed CHANGELOG.md
+
+Blocked by: nothing (T5 consumes it later).
+
+1. Follow the illi-voice changelog rules:
+   observable behavior first, kind labels
+   (Added/Changed/Fixed/Security), ISO dates, newest first,
+   bracketed versions as compare links.
+2. Seed an Unreleased section from the fork's shipped work:
+   the license preservation, the standalone build, the Foundation
+   collections, the async migration, the optimizer hardening,
+   pin/mirror, packaging, and the prose sweep —
+   `git log --oneline master` is the source; write what a consumer
+   observes, one line each.
+
+Verify: every entry names observable behavior, none names only a
+commit; dates ISO; compare links resolve.
+
+### T19. Add .editorconfig
+
+Blocked by: nothing.
+
+1. Encode what the tree already does — tabs in `.cs` (match the
+   existing files), UTF-8, LF, final newline —
+   plus the doc-comment adjacency the `illi-voice-csharp` variant
+   states (no blank line between `///` and member).
+2. Add the analyzer severities only where the codebase is already
+   clean; introduce no new warnings
+   (the build's warning set is the regression surface —
+   compare before/after).
+
+Verify: `dotnet build` warning count unchanged; `git diff` after an
+IDE format of one untouched file is empty.
+
+### T20. Optional: sweep the upstream C# comment surface
+
+Blocked by: an explicit owner request. Deliberately out of scope so
+far: ~1,600 upstream files, large churn, prose that is not the fork's.
+If requested: batch by project, comment-only line changes with the
+code-identity check per batch, `illi-voice-csharp` rules,
+upstream-authored `<summary>` prose corrected only where factually
+wrong against the code.
+
+### T21. Optional: trim the upstream marketing README tail
+
+Blocked by: an explicit owner request; tied to D4's posture.
+The English README below `## Introduction ##` is upstream marketing
+(connector matrix, product links) that describes products this
+repository does not contain.
+If requested: replace with a short factual capability section plus a
+link to upstream's site, and mirror the decision in the RU and ZH
+READMEs (CJK rules apply to the ZH edit).
