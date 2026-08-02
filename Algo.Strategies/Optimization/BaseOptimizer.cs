@@ -399,7 +399,7 @@ public abstract class BaseOptimizer : BaseLogReceiver
 		IStrategyParam[] parameters;
 		HistoryEmulationConnector connector;
 		CopyPortfolioProvider pfProvider = null;
-		Guid iterationId;
+		Guid iterationId = default;
 
 		using (_sync.EnterScope())
 		{
@@ -417,30 +417,50 @@ public abstract class BaseOptimizer : BaseLogReceiver
 			}
 
 			pfProvider = new CopyPortfolioProvider(PortfolioProvider);
-			var next = tryGetNext(pfProvider);
 
-			if (next is null)
+			var reserved = false;
+
+			try
 			{
+				var next = tryGetNext(pfProvider);
+
+				if (next is null)
+				{
+					pfProvider.Dispose();
+
+					_allIterationsStarted = true;
+					CheckFinished();
+					return false;
+				}
+
+				(strategy, parameters) = next.Value;
+
+				// CanStartNext was checked above under this same lock, so the reservation cannot fail here.
+				if (!_batchManager.TryReserveSlot(out iterationId))
+				{
+					pfProvider.Dispose();
+					return false;
+				}
+
+				reserved = true;
+
+				strategy.Parent ??= this;
+
+				connector = CreateConnector(pfProvider, adapterCache, storageCache, startTime, stopTime);
+				_startedConnectors.Add(connector);
+			}
+			catch
+			{
+				// The completion gate does not exist yet, so this catch owns the cleanup:
+				// the provider's handlers leave the run-lifetime provider, and a reserved
+				// slot returns to the batch instead of shrinking it for the rest of the run.
 				pfProvider.Dispose();
 
-				_allIterationsStarted = true;
-				CheckFinished();
-				return false;
+				if (reserved)
+					_batchManager.CompleteIteration(iterationId);
+
+				throw;
 			}
-
-			(strategy, parameters) = next.Value;
-
-			// CanStartNext was checked above under this same lock, so the reservation cannot fail here.
-			if (!_batchManager.TryReserveSlot(out iterationId))
-			{
-				pfProvider.Dispose();
-				return false;
-			}
-
-			strategy.Parent ??= this;
-
-			connector = CreateConnector(pfProvider, adapterCache, storageCache, startTime, stopTime);
-			_startedConnectors.Add(connector);
 		}
 
 		var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);

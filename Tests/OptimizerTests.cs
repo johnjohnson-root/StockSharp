@@ -812,4 +812,85 @@ public class OptimizerTests : BaseTestClass
 
 		AreEqual(0, count, "No iterations should complete when cancelled before start");
 	}
+
+	private class CountingPortfolioProvider(IPortfolioProvider inner) : IPortfolioProvider
+	{
+		private int _subscriptions;
+
+		/// <summary>
+		/// Live event subscriptions: adds minus removes across both events.
+		/// </summary>
+		public int Subscriptions => _subscriptions;
+
+		public IEnumerable<Portfolio> Portfolios => inner.Portfolios;
+
+		public Portfolio LookupByPortfolioName(string name) => inner.LookupByPortfolioName(name);
+
+		public event Action<Portfolio> NewPortfolio
+		{
+			add { Interlocked.Increment(ref _subscriptions); inner.NewPortfolio += value; }
+			remove { Interlocked.Decrement(ref _subscriptions); inner.NewPortfolio -= value; }
+		}
+
+		public event Action<Portfolio> PortfolioChanged
+		{
+			add { Interlocked.Increment(ref _subscriptions); inner.PortfolioChanged += value; }
+			remove { Interlocked.Decrement(ref _subscriptions); inner.PortfolioChanged -= value; }
+		}
+	}
+
+	/// <summary>
+	/// Tests that a throwing tryGetNext leaves no event handlers hooked on the
+	/// run-lifetime portfolio provider and costs no batch capacity: every
+	/// remaining iteration still runs. Regression test for the undisposed
+	/// per-iteration CopyPortfolioProvider on the tryGetNext error path.
+	/// </summary>
+	[TestMethod]
+	public async Task BruteForceRunAsyncDisposesProviderWhenTryGetNextThrows()
+	{
+		var security = CreateTestSecurity();
+		var portfolio = CreateTestPortfolio();
+
+		var secProvider = new CollectionSecurityProvider([security]);
+		var counting = new CountingPortfolioProvider(new CollectionPortfolioProvider([portfolio]));
+		var storageRegistry = GetHistoryStorage();
+
+		using var optimizer = new BruteForceOptimizer(secProvider, counting, storageRegistry);
+
+		// Single worker keeps the call sequence deterministic.
+		optimizer.EmulationSettings.BatchSize = 1;
+
+		var startTime = Paths.HistoryBeginDate;
+		var stopTime = Paths.HistoryBeginDate.AddDays(6);
+
+		var strategies = CreateStrategyIterations(security, portfolio, 20, 30, 10, 60, 80, 20).ToList();
+		IsTrue(strategies.Count >= 2, "Need at least 2 iterations around the poisoned call");
+
+		var queue = new Queue<(Strategy strategy, IStrategyParam[] parameters)>(strategies);
+		var calls = 0;
+		var results = 0;
+
+		await foreach (var _ in optimizer.RunAsync(startTime, stopTime, pfProvider =>
+		{
+			// The second call throws without consuming a strategy; the worker's
+			// failure handling retries, so every queued strategy still runs.
+			if (++calls == 2)
+				throw new InvalidOperationException("Poisoned tryGetNext.");
+
+			if (queue.Count == 0)
+				return null;
+
+			var next = queue.Dequeue();
+			next.strategy.Portfolio = pfProvider.LookupByPortfolioName(next.strategy.Portfolio.Name);
+			return next;
+		}, CancellationToken))
+		{
+			results++;
+		}
+
+		AreEqual(strategies.Count, results,
+			$"All {strategies.Count} strategies must complete despite the poisoned call, got {results}");
+		AreEqual(0, counting.Subscriptions,
+			"Every per-iteration portfolio provider must unhook its handlers, including the poisoned call's");
+	}
 }
