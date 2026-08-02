@@ -88,7 +88,11 @@ jobs:
         # wholesale exclusion into a per-OS one - or confirm the defect is platform
         # independent and send the investigation at the IronPython module import.
         # Remove this step once KNOWN-ISSUES.md records the answer.
-        if: matrix.os == 'windows-latest'
+        # success() || failure() rather than a bare os check: a failing test step
+        # would otherwise skip this one, and the probe is most worth reading on
+        # exactly the runs where something else went wrong. It stays out of
+        # cancelled runs, which always() would catch.
+        if: matrix.os == 'windows-latest' && (success() || failure())
         continue-on-error: true
         run: dotnet test StockSharp_Tests.slnx --no-build --configuration Release --filter "FullyQualifiedName~PythonAnalyticsScripts"
 
