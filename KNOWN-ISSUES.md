@@ -233,6 +233,43 @@ and leave one honest skip instead of eleven.
 That trade costs a test method per data type,
 so it waits for someone who wants the reporting fidelity enough to pay for it.
 
+## Roughly 32 history-data tests pass silently when the data is absent
+
+The 11 skips above are the visible half of the story.
+The invisible half is larger:
+about 32 tests check `Paths.HistoryDataPath` for null,
+print a line to the console, and `return` —
+which MSTest reports as **passed**, having executed no assertion at all.
+
+    Tests/BacktestingTests.cs:559                  SkipIfNoHistoryData(), 24 callers
+    Tests/StrategyDecomposedEquivalenceTests.cs:222   SkipIfNoHistoryData(), 6 callers
+    Tests/OptimizerPauseTests.cs:81, 168           inline, 2 tests
+
+The same codebase does it correctly in six other places,
+which is what makes this a defect rather than a convention:
+`PathsTests.cs:25,47,57`,
+`StrategyReferenceSurfaceTests.cs:776`,
+`StrategyDecomposedFullEquivalenceTests.cs:1107`,
+and `StrategyDecomposedEquivalenceTests.cs:2724`
+all call `Inconclusive(...)` instead,
+and two of them carry a comment saying why —
+"Not a silent pass: without market data a zero-vs-zero comparison
+would be meaningless."
+
+`Paths.HistoryDataPath` resolves by walking the NuGet global-packages
+folder for `stocksharp.samples.historydata`,
+so it is null wherever that package has not been restored.
+CI restores it today and these tests do run there.
+The exposure is a CI image or a contributor machine where the package
+is missing:
+the backtesting and strategy-equivalence suites would report green
+while asserting nothing,
+and nothing in the run output would distinguish that from real coverage.
+
+The fix is mechanical —
+`return` becomes `Inconclusive(...)` at the three sites above —
+and it converts a silent 32-test hole into 32 visible skips.
+
 ## CI hang: resolved (flaky tests, fixed)
 
 Early CI runs aborted via `--blame-hang` after ~8 minutes of inactivity.

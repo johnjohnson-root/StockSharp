@@ -104,21 +104,30 @@ Blocked by: a completed T2 pass.
 Verify: standard gate green; offline restore succeeds; mirror artifact
 in CI ("Mirror packages" workflow) uploads without error.
 
-### T4. Watch the pinned packages for advisories
+### T4. Advisory watch — done 2026-08-02
 
-Blocked by: nothing. Pinned packages take no patches, so watching is
-the only mitigation while any pin remains.
+`.github/workflows/advisories.yml` runs
+`dotnet list package --vulnerable --include-transitive` weekly
+and fails the run on any hit,
+so a notification names the package, severity and advisory URL.
+`dotnet list` exits 0 either way,
+so the step reads the per-project report text
+and fails loudly when a restore or the command itself breaks
+rather than reporting a clean scan over nothing.
 
-1. Add a scheduled workflow (weekly) running
-   `dotnet list StockSharp_Tests.slnx package --vulnerable --include-transitive`
-   against the pinned graph.
-2. Fail the run on any hit, so the repo owner gets a notification
-   naming the package and advisory.
-3. Document the response path in the workflow header comment:
-   an advisory against a pinned package forces the D1 conversation
-   for that package immediately.
+It scans three solutions rather than the one this item named:
+`StockSharp_Tests.slnx` misses the `Localization.Langs` satellites
+and the two `Algo.Analytics` script projects,
+and `Ecng.Interop` reaches the graph through a sample alone.
 
-Verify: dispatch the workflow manually once; it completes green today.
+The header records the response path.
+An advisory against a pinned package escalates that package's
+clean-room replacement immediately, per decision record 0003,
+because replacement is the only remedy a frozen package admits;
+a hit against an unpinned transitive package takes a version bump.
+The `pull_request` trigger on the pin files re-scans the graph
+whenever it changes, which is also what proved the workflow green —
+a schedule runs from the default branch alone.
 
 ## Packaging and release
 
@@ -169,16 +178,21 @@ still floats within constraints.
 Verify: standard gate green; a deliberate version bump of one package
 without lock regeneration fails CI in locked mode (then revert it).
 
-### T8. Pin the SDK with global.json
+### T8. SDK pin — done 2026-08-02
 
-Blocked by: nothing.
-
-1. Add `global.json` at the root:
-   the `10.0.x` SDK version CI resolves today, `rollForward: latestPatch`.
-2. Match the `setup-dotnet` versions in all three workflows.
-
-Verify: `dotnet --version` under the repo root reports the pinned line;
-standard gate green; CI green on all three OSes.
+`global.json` names 10.0.302 —
+the version CI resolved, read from a `setup-dotnet` step on master —
+with `rollForward: latestPatch` and `allowPrerelease` off,
+so the 10.0.3xx band takes patches
+and a jump to another band fails the build naming the missing version
+instead of changing compiler and analyzer behaviour silently.
+All five workflows ask `setup-dotnet` for 10.0.302 rather than `10.0.x`,
+so the runner installs exactly what the build requires.
+The `6.0.x` line stays floating:
+nothing in either solution targets net6.0,
+the entry supplies a runtime alone,
+and 6.0 is out of support so its resolved patch no longer moves.
+CI green on all three operating systems.
 
 ## Samples
 
@@ -299,6 +313,19 @@ windows passing turns the wholesale filter into a per-OS one,
 windows failing makes the defect platform-independent and points the
 investigation at the IronPython `Indicators` import.
 Remove the probe once `KNOWN-ISSUES.md` records the answer.
+
+The audit missed a third class on its first pass,
+and `KNOWN-ISSUES.md` now carries it:
+roughly 32 tests guard on `Paths.HistoryDataPath` being null
+and `return` after a `Console.WriteLine`,
+which MSTest reports as passed with no assertion executed —
+`BacktestingTests.cs:559` (24 callers),
+`StrategyDecomposedEquivalenceTests.cs:222` (6 callers),
+and `OptimizerPauseTests.cs:81,168`.
+Six sibling sites call `Inconclusive(...)` instead,
+two of them with a comment saying why,
+so the fix is to make the three above match them.
+That is the remaining work in this item.
 
 ### T14. Retire the sync-facade shims — inventory corrected 2026-08-02
 
