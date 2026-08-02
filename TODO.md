@@ -345,7 +345,8 @@ The library projects carry 71 such markers:
 They fall into three kinds, and only the first is this item's work.
 
 **Internal callers on the sync facade — 31 sites, the migration target.**
-Pragma-marked:
+Pragma-marked, found by
+`grep -rn '#pragma warning disable CS0618' --include='*.cs'`:
 
     Algo/PositionManagement/PositionTargetManager.cs   115, 155, 277, 287
     Algo.Strategies/Quoting/QuotingProcessor.cs        159, 297, 313
@@ -353,14 +354,21 @@ Pragma-marked:
     Algo.Strategies/Strategy_TransactionProvider.cs    188, 196
     BusinessEntities/EntitiesExtensions.cs             123, 131, 189, 2353
 
-Unsuppressed, and warning on every Release build:
+Unsuppressed, read from the `CS0618` lines of a real
+`dotnet build StockSharp_Tests.slnx -c Release`:
 
-    Algo/TraderHelper.cs                    201, 829, 830, 831, 832, 1196
-    Algo/Storages/Csv/CsvEntityList.cs      157
-    Algo.Strategies/Strategy.cs             90, 91
-    Algo.Strategies/Strategy_HighLevelMisc.cs   154
+    Algo/TraderHelper.cs                            201, 1196
+    Algo/Storages/Csv/CsvEntityList.cs              157
     Algo.Strategies/Optimization/BaseOptimizer.cs   608, 649
-    BusinessEntities/EntitiesExtensions.cs  127, 134
+    Algo.Strategies/Quoting/QuotingProcessor.cs     183, 200, 447
+    Algo.Strategies/Strategy.cs                     90, 91
+    Algo.Strategies/Strategy_HighLevelMisc.cs       154
+    BusinessEntities/EntitiesExtensions.cs          127, 134
+    Diagram.Core/Elements/OrderMassCancelDiagramElement.cs   102
+
+That build reports 89 distinct `CS0618` sites in all;
+the 75 not listed above sit in `Tests/`,
+which exercises the obsolete surface deliberately and stays as it is.
 
 `EntitiesExtensions.ReRegisterOrderEx` shows the split inside one method:
 `EditOrder` and `CancelOrder` sit under pragmas at 123 and 131,
@@ -405,10 +413,19 @@ trip per step.
 
 Take them one chain at a time, smallest first.
 Regenerate the unsuppressed half with
-`dotnet build StockSharp.slnx -c Release` and read the `CS0618` lines;
-regenerate the suppressed half with
+`dotnet build StockSharp_Tests.slnx -c Release` and read the `CS0618`
+lines; regenerate the suppressed half with
 `grep -rn '#pragma warning disable CS0618' --include='*.cs'`.
-Both halves have to fall for the count to reach zero.
+Both halves have to fall for the count to reach zero,
+and neither command finds the other's sites.
+
+Read both from the tools rather than from a summary.
+An earlier revision of this entry listed four `TraderHelper` sites at
+829-832 that do not warn at all:
+`Connector.Subscribe` is a concrete method and carries no `[Obsolete]`,
+where the `ISubscriptionProvider.Subscribe` it resembles does.
+The same revision missed the three `QuotingProcessor` sites
+and the `Diagram.Core` one.
 
 ### T15. The two in-tree upstream defects — closed 2026-08-02, no work
 
