@@ -38,15 +38,16 @@ public static class AsmInit
 		// left running, the log flusher keeps the test host process alive past the run
 		Helper.LogManager.Dispose();
 
-		// Post-run watchdog: anything still holding the test host alive after cleanup would
-		// otherwise hit --blame-hang 8 minutes later, blamed on whichever test happened to run
-		// last (see KNOWN-ISSUES.md). The thread is background, so it never delays a normal exit.
+		// Post-run watchdog: anything still holding the test host alive after cleanup exits
+		// with an attributable message instead of hanging indefinitely (see KNOWN-ISSUES.md).
+		// At 60 minutes (decision record 0007) CI's --blame-hang fires first; the watchdog
+		// covers runs without it. The thread is background, so it never delays a normal exit.
 		var watchdog = new Thread(() =>
 		{
-			Thread.Sleep(TimeSpan.FromMinutes(3));
+			Thread.Sleep(TimeSpan.FromMinutes(60));
 
 			Console.Error.WriteLine(
-				"[AsmInit] Test host still alive 3 minutes after AssemblyCleanup " +
+				"[AsmInit] Test host still alive 60 minutes after AssemblyCleanup " +
 				$"(OS threads: {System.Diagnostics.Process.GetCurrentProcess().Threads.Count}). " +
 				"Something leaked a foreground thread or blocked shutdown; exiting with code 97.");
 

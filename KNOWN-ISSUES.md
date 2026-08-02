@@ -78,7 +78,8 @@ so the fix is asserted from the defects, not from a reproduced hang):
   (unbounded handler-list growth over a long optimization);
   it is now disposed with its iteration.
 
-Additionally, `[AssemblyCleanup]` now arms a 3-minute background watchdog:
+Additionally, `[AssemblyCleanup]` now arms a 60-minute background watchdog
+(decision record 0007):
 if the test host is still alive that long after cleanup,
 it prints a diagnostic and exits with code 97 —
 converting any recurrence of this failure class
