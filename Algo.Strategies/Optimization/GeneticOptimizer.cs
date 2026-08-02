@@ -88,6 +88,20 @@ public class GeneticOptimizer : BaseOptimizer
 
 				return (double)fitVal;
 			}
+			catch (Exception ex) when (ex is not OperationCanceledException)
+			{
+				// One poisoned parameter set costs its own chromosome rather than the run.
+				// GeneticSharp lets a fitness exception out through ga.Start(), and the
+				// driver task there is discarded, so the failure would end the enumeration
+				// early with a short result set and no error reaching the caller.
+				_optimizer.AddErrorLog(ex);
+
+				// The score the iteration-limit path above already returns: selection ranks
+				// the chromosome last and the population breeds past it. The failure stays
+				// out of _cache, so a transient fault does not pin this parameter set
+				// worthless for the rest of the run.
+				return double.MinValue;
+			}
 			finally
 			{
 				_optimizer.FreeAdapterCache(adapterCache);
@@ -456,6 +470,14 @@ public class GeneticOptimizer : BaseOptimizer
 			catch (Exception ex) when (cancellationToken.IsCancellationRequested)
 			{
 				this.AddWarningLog("GA cancelled: {0}", ex.Message);
+			}
+			catch (Exception ex)
+			{
+				// Nothing awaits this task, so an escaping exception is unobserved: the
+				// finally completes the channel and the caller reads a truncated run as a
+				// normal one. Fitness failures no longer arrive here, and whatever else
+				// does at least leaves a record.
+				this.AddErrorLog(ex);
 			}
 			finally
 			{

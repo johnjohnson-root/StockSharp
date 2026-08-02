@@ -636,6 +636,143 @@ public class OptimizerTests : BaseTestClass
 	}
 
 	/// <summary>
+	/// Tests that one iteration failing to start costs its own chromosome
+	/// and leaves the genetic run to finish its iteration budget.
+	/// </summary>
+	/// <remarks>
+	/// Regression guard for a fitness exception reaching the GeneticSharp loop:
+	/// it leaves ga.Start() into a discarded task, which completes the channel
+	/// in its finally, so the caller reads a truncated run as a normal one.
+	/// </remarks>
+	[TestMethod]
+	public async Task GeneticRunAsyncSurvivesIterationStartFailure()
+	{
+		var security = CreateTestSecurity();
+		var portfolio = CreateTestPortfolio();
+
+		var secProvider = new CollectionSecurityProvider([security]);
+		var pfProvider = new CollectionPortfolioProvider([portfolio]);
+		var storageRegistry = GetHistoryStorage();
+
+		using var optimizer = new GeneticOptimizer(secProvider, pfProvider, storageRegistry, Paths.FileSystem);
+
+		var startTime = Paths.HistoryBeginDate;
+		var stopTime = Paths.HistoryBeginDate.AddDays(6);
+
+		var strategy = new SmaStrategy
+		{
+			Security = security,
+			Portfolio = portfolio,
+			Volume = 1,
+			CandleType = TimeSpan.FromMinutes(1).TimeFrame(),
+			Long = 80,
+			Short = 30,
+		};
+
+		var shortParam = strategy.Parameters[nameof(SmaStrategy.Short)];
+		var longParam = strategy.Parameters[nameof(SmaStrategy.Long)];
+
+		// One iteration at a time over a small population, so the poisoned evaluation
+		// lands in the first generation and the surviving budget is what the run does
+		// after it. Without the fix the GA dies there and nothing past it evaluates.
+		optimizer.EmulationSettings.BatchSize = 1;
+		optimizer.EmulationSettings.MaxIterations = 6;
+		optimizer.Settings.Population = 2;
+		optimizer.Settings.PopulationMax = 2;
+		optimizer.Settings.GenerationsMax = 10;
+
+		// Stagnation would end the run on identical fitness rather than on the
+		// iteration budget, which is the thing under test here.
+		optimizer.Settings.GenerationsStagnation = 0;
+
+		var started = 0;
+
+		optimizer.StrategyInitialized += (s, p) =>
+		{
+			if (Interlocked.Increment(ref started) == 1)
+				throw new InvalidOperationException("Poisoned iteration.");
+		};
+
+		var geneticParams = new (IStrategyParam param, object from, object to, object step, IEnumerable values)[]
+		{
+			(shortParam, 20, 40, 5, null),
+			(longParam, 60, 100, 10, null),
+		};
+
+		var results = new List<Strategy>();
+
+		await foreach (var (s, _) in optimizer.RunAsync(startTime, stopTime, strategy, geneticParams, st => st.PnL, cancellationToken: CancellationToken))
+		{
+			results.Add(s);
+		}
+
+		// Six iterations are consumed, the first one fails, so five can report.
+		// The unfixed path stops at the first generation and reports at most one.
+		IsTrue(results.Count >= 3,
+			$"The run must continue past a failed fitness evaluation, got {results.Count} results");
+	}
+
+	/// <summary>
+	/// Tests that a token already cancelled before the genetic run starts
+	/// terminates the enumeration with no completed iterations and no hang.
+	/// </summary>
+	[TestMethod]
+	public async Task GeneticRunAsyncCancelledBeforeStart()
+	{
+		var security = CreateTestSecurity();
+		var portfolio = CreateTestPortfolio();
+
+		var secProvider = new CollectionSecurityProvider([security]);
+		var pfProvider = new CollectionPortfolioProvider([portfolio]);
+		var storageRegistry = GetHistoryStorage();
+
+		using var optimizer = new GeneticOptimizer(secProvider, pfProvider, storageRegistry, Paths.FileSystem);
+
+		var startTime = Paths.HistoryBeginDate;
+		var stopTime = Paths.HistoryBeginDate.AddDays(6);
+
+		var strategy = new SmaStrategy
+		{
+			Security = security,
+			Portfolio = portfolio,
+			Volume = 1,
+			CandleType = TimeSpan.FromMinutes(1).TimeFrame(),
+			Long = 80,
+			Short = 30,
+		};
+
+		var shortParam = strategy.Parameters[nameof(SmaStrategy.Short)];
+		var longParam = strategy.Parameters[nameof(SmaStrategy.Long)];
+
+		optimizer.EmulationSettings.MaxIterations = 10;
+
+		var geneticParams = new (IStrategyParam param, object from, object to, object step, IEnumerable values)[]
+		{
+			(shortParam, 20, 40, 5, null),
+			(longParam, 60, 100, 10, null),
+		};
+
+		using var cts = CancellationTokenSource.CreateLinkedTokenSource(CancellationToken);
+		cts.Cancel();
+
+		var count = 0;
+
+		try
+		{
+			await foreach (var _ in optimizer.RunAsync(startTime, stopTime, strategy, geneticParams, st => st.PnL, cancellationToken: cts.Token))
+			{
+				count++;
+			}
+		}
+		catch (OperationCanceledException)
+		{
+			// expected
+		}
+
+		AreEqual(0, count, "No iterations should complete when cancelled before start");
+	}
+
+	/// <summary>
 	/// Tests cancellation by iteration count inside the loop (consumer-side limit).
 	/// </summary>
 	[TestMethod]
