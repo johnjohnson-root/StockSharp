@@ -410,7 +410,14 @@ public class CandleTests : BaseTestClass
 		var sub = new CandleBuilderSubscription(md);
 		var transform = new TickCandleBuilderValueTransform();
 
-		var now = DateTime.UtcNow;
+		// Anchored to the start of a minute, because the ticks below sit at +0s, +1s and
+		// +1min and the assertions require the first two to share one 1-minute candle.
+		// A raw UtcNow landing in the final second of a minute puts the +1s tick in the
+		// next candle, so Process returns the finished candle beside the new one and
+		// Single() throws "Sequence contains more than one element" - roughly once in
+		// sixty runs, which is how this test entered the flaky tail.
+		var utcNow = DateTime.UtcNow;
+		var now = new DateTime(utcNow.Year, utcNow.Month, utcNow.Day, utcNow.Hour, utcNow.Minute, 0, DateTimeKind.Utc);
 
 		var tick1 = new ExecutionMessage
 		{
