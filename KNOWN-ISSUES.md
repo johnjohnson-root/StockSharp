@@ -290,29 +290,63 @@ and `SubscriptionHolderTests` no longer leaks per-holder `LogManager` instances.
 CI uploads `TestResults` (blame sequence + hang dumps) on failure
 should anything recur.
 
-## Open, found by reading: eleven defects a survey turned up
+## Fixed here: a failed storage save discarded the buffered data
+
+`BufferMessageAdapter`'s 10-second flush cycle read each buffer through
+`Buffer.GetXxx()`, which snapshots and clears in one step
+(`StorageBuffer.cs:16-22`),
+and wrapped the whole cycle in a single log-only `try`/`catch`.
+Any `SaveAsync` that threw therefore stranded every message already taken
+in that cycle:
+out of the buffer, never in storage, and owned by nobody.
+The loss reached past the failing security —
+one dictionary from `GetTicks()` carries every security,
+and the throw abandoned the rest of it along with every later buffer kind.
+
+The cycle now keeps what it could not persist.
+Each kind is saved key by key through `SaveEachAsync`,
+which merges the previous cycle's leftovers with the fresh batch,
+saves each key on its own,
+and holds a key whose save throws for the next cycle
+while the remaining keys still go out.
+A backlog is bounded at 100,000 messages per key,
+and passing it drops the oldest with a warning
+rather than growing until the process dies.
+
+Transactions are the exception, and deliberately:
+that path consumes `_replaceTransactions` entries as it walks the batch,
+so a second pass would take different branches.
+Its per-security failures are caught and logged instead,
+which still stops one security from abandoning the others.
+
+Two defects in the same loop went with it.
+The cycle's `interval.Delay` sat inside the `try`,
+so a cycle that threw skipped the wait
+and the loop spun at full speed for as long as storage kept failing;
+the delay now runs outside it.
+`StopStorageTimer`'s three bare `catch { }` blocks log,
+with the cancellation the one-second wait legitimately produces
+filtered out.
+
+`BufferedTicksSurviveAFailedSave` covers the regression:
+storage refuses the first save and accepts afterwards,
+and the tick has to reach it on a later cycle.
+Against the unfixed adapter the test reports
+"storage saw 1 attempt(s)" and fails after 45 seconds,
+because no second attempt ever comes.
+
+## Open, found by reading: ten defects a survey turned up
 
 A read-through of the tree on 2026-08-02 —
 `Messages`, `Algo` and its storage layer, `Algo.Strategies`,
 `Algo.Testing`, `MatchingEngine`, the entity projects, and `Tests` —
 found these.
 None is reproduced by a failing test,
-and none is fixed;
+and none is fixed
+(an eleventh, the buffer flush losing data, is fixed above);
 each carries the file and line that supports it
 so the next reader can start from evidence rather than from this summary.
 They are ordered by consequence.
-
-**A flush failure discards buffered market data.**
-`Algo/Storages/BufferMessageAdapter.cs:277-456`
-drains each buffer with a `Get()`-and-clear
-(`StorageBuffer.cs:16-22`) before persisting,
-and wraps the whole cycle in one log-only `try`/`catch`.
-One `SaveAsync` throw therefore drops every message already dequeued in
-that cycle, including other securities pulled by the same call.
-Three bare `catch { }` sit beside it at `:473,479,485`,
-and `StopStorageTimer` (`:462-487`) waits one second for the flush task
-before disposing its cancellation source,
-leaving a slow flush running detached.
 
 **`MaxMessageCount` does nothing.**
 `Algo.Testing/HistoryEmulationConnector.cs:255-267` —

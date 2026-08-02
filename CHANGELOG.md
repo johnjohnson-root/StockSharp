@@ -95,6 +95,15 @@ so the section below stays `Unreleased` until a feed exists.
   The failed evaluation scores `double.MinValue` and logs the error, where it
   previously left the GA loop and ended the run with a truncated result set
   and no error reaching the caller.
+- Buffered market data survives a storage failure.
+  The 10-second flush cycle read each buffer with a snapshot-and-clear and
+  wrapped the whole cycle in one log-only handler, so a `SaveAsync` that
+  threw stranded every message already taken in that cycle - out of the
+  buffer, never in storage - including securities the same call had handed
+  over. The cycle now saves key by key and holds what it could not persist
+  for the next pass, bounded at 100,000 messages per key with a warning
+  when it trims. A cycle that fails also waits its interval before
+  retrying, where it previously spun at full speed.
 - A suspended backtest no longer blocks a thread-pool thread.
   An optimizer pause parks a whole batch of replay loops at once, which
   starved the pool on small machines.

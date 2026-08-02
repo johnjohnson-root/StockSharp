@@ -25,7 +25,7 @@ The standard gate for any code change:
     dotnet test StockSharp_Tests.slnx --no-build -c Release \
       --filter 'FullyQualifiedName!~PythonAnalyticsScripts'
 
-4461 pass, 0 fail, 11 documented skips, prompt test-host exit.
+4462 pass, 0 fail, 11 documented skips, prompt test-host exit.
 A new test earns its place by failing on the unfixed code:
 stash the fix, build, watch the test fail, pop the stash.
 

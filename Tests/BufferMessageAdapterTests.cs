@@ -113,6 +113,56 @@ public class BufferMessageAdapterTests : BaseTestClass
 		ValueTask IMarketDataStorage<ExecutionMessage>.DeleteAsync(IEnumerable<ExecutionMessage> data, CancellationToken cancellationToken) => default;
 	}
 
+	/// <summary>
+	/// Tick storage that fails every save until <see cref="FailUntil"/> calls have been
+	/// made, then records what it is given.
+	/// </summary>
+	private sealed class FlakyExecutionStorage(SecurityId securityId, int failUntil) : IMarketDataStorage<ExecutionMessage>
+	{
+		private readonly SecurityId _securityId = securityId;
+		private int _attempts;
+
+		public int FailUntil => failUntil;
+		public int Attempts => Volatile.Read(ref _attempts);
+		public List<ExecutionMessage> Saved { get; } = [];
+		public TaskCompletionSource<bool> SavedAfterFailure { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+		IAsyncEnumerable<DateTime> IMarketDataStorage.GetDatesAsync() => AsyncEnumerable.Empty<DateTime>();
+		DataType IMarketDataStorage.DataType => DataType.Ticks;
+		SecurityId IMarketDataStorage.SecurityId => _securityId;
+		IMarketDataStorageDrive IMarketDataStorage.Drive => Mock.Of<IMarketDataStorageDrive>();
+		bool IMarketDataStorage.AppendOnlyNew { get; set; }
+		IMarketDataSerializer IMarketDataStorage.Serializer => Mock.Of<IMarketDataSerializer>();
+
+		public IAsyncEnumerable<ExecutionMessage> LoadAsync(DateTime date) => AsyncEnumerable.Empty<ExecutionMessage>();
+		IAsyncEnumerable<Message> IMarketDataStorage.LoadAsync(DateTime date) => LoadAsync(date);
+
+		ValueTask<int> IMarketDataStorage.SaveAsync(IEnumerable<Message> data, CancellationToken cancellationToken)
+			=> ((IMarketDataStorage<ExecutionMessage>)this).SaveAsync(data.Cast<ExecutionMessage>(), cancellationToken);
+
+		ValueTask IMarketDataStorage.DeleteAsync(IEnumerable<Message> data, CancellationToken cancellationToken) => default;
+		ValueTask IMarketDataStorage.DeleteAsync(DateTime date, CancellationToken cancellationToken) => default;
+		ValueTask<IMarketDataMetaInfo> IMarketDataStorage.GetMetaInfoAsync(DateTime date, CancellationToken cancellationToken) => new((IMarketDataMetaInfo)null);
+
+		IMarketDataSerializer<ExecutionMessage> IMarketDataStorage<ExecutionMessage>.Serializer => Mock.Of<IMarketDataSerializer<ExecutionMessage>>();
+
+		public ValueTask<int> SaveAsync(IEnumerable<ExecutionMessage> data, CancellationToken cancellationToken)
+		{
+			if (Interlocked.Increment(ref _attempts) <= failUntil)
+				throw new InvalidOperationException("Storage unavailable.");
+
+			var saved = data.ToArray();
+
+			lock (Saved)
+				Saved.AddRange(saved);
+
+			SavedAfterFailure.TrySetResult(true);
+			return new(saved.Length);
+		}
+
+		ValueTask IMarketDataStorage<ExecutionMessage>.DeleteAsync(IEnumerable<ExecutionMessage> data, CancellationToken cancellationToken) => default;
+	}
+
 	private static ExecutionMessage CreateTick(SecurityId securityId, DateTime serverTime) => new()
 	{
 		SecurityId = securityId,
@@ -285,5 +335,73 @@ public class BufferMessageAdapterTests : BaseTestClass
 		saved[0].ServerTime.AssertEqual(tick.ServerTime);
 		saved[0].TradePrice.AssertEqual(tick.TradePrice);
 		saved[0].TradeVolume.AssertEqual(tick.TradeVolume);
+	}
+
+	/// <summary>
+	/// Tests that ticks the storage refused on one cycle are saved on the next
+	/// rather than dropped.
+	/// </summary>
+	/// <remarks>
+	/// Regression guard for the buffer flush losing data: Buffer.GetTicks() reads and
+	/// clears in one step, so before the retry the messages a failing SaveAsync had
+	/// already been handed belonged to nobody - out of the buffer, never in storage.
+	/// The cycle interval is 10 seconds, so this waits for a second pass.
+	/// </remarks>
+	[TestMethod]
+	[Timeout(60_000, CooperativeCancellation = true)]
+	public async Task BufferedTicksSurviveAFailedSave()
+	{
+		var token = CancellationToken;
+
+		var secId = new SecurityId { SecurityCode = "TEST", BoardCode = BoardCodes.Test };
+
+		// Fail the first cycle outright; the second must carry the same ticks.
+		var execStorage = new FlakyExecutionStorage(secId, failUntil: 1);
+
+		var registry = new Mock<IStorageRegistry>();
+		registry
+			.Setup(r => r.GetStorage(It.IsAny<SecurityId>(), It.IsAny<DataType>(), It.IsAny<IMarketDataDrive>(), It.IsAny<StorageFormats>()))
+			.Returns<SecurityId, DataType, IMarketDataDrive, StorageFormats>((_, dt, _, _) =>
+			{
+				if (dt == DataType.Ticks)
+					return execStorage;
+
+				throw new NotSupportedException(dt.ToString());
+			});
+
+		var settings = new StorageCoreSettings
+		{
+			StorageRegistry = registry.Object,
+			Mode = StorageModes.Incremental,
+			Format = StorageFormats.Binary,
+		};
+
+		var buffer = new StorageBuffer();
+		var tick = CreateTick(secId, DateTime.UtcNow);
+		buffer.ProcessOutMessage(tick);
+
+		var snapshotRegistry = new InMemorySnapshotRegistry()
+			.Add(DataType.Level1, new InMemorySnapshotStorage<SecurityId, Level1ChangeMessage>(m => m.SecurityId))
+			.Add(DataType.MarketDepth, new InMemorySnapshotStorage<SecurityId, QuoteChangeMessage>(m => m.SecurityId));
+
+		var inner = new PassThroughMessageAdapter(new IncrementalIdGenerator());
+
+		using var adapter = new BufferMessageAdapter(inner, settings, buffer, snapshotRegistry);
+
+		await adapter.SendInMessageAsync(new ConnectMessage(), token);
+
+		var completed = await Task.WhenAny(execStorage.SavedAfterFailure.Task, Task.Delay(TimeSpan.FromSeconds(45), token));
+
+		(completed == execStorage.SavedAfterFailure.Task)
+			.AssertTrue($"The tick refused on the first cycle must be saved on a later one; storage saw {execStorage.Attempts} attempt(s)");
+
+		(execStorage.Attempts > execStorage.FailUntil).AssertTrue("The save must have been retried");
+
+		lock (execStorage.Saved)
+		{
+			execStorage.Saved.Count.AssertEqual(1);
+			execStorage.Saved[0].SecurityId.AssertEqual(secId);
+			execStorage.Saved[0].ServerTime.AssertEqual(tick.ServerTime);
+		}
 	}
 }
