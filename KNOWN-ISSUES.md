@@ -289,3 +289,115 @@ Independently, `Tests/Helper.cs`'s static `LogManager` is now disposed in `[Asse
 and `SubscriptionHolderTests` no longer leaks per-holder `LogManager` instances.
 CI uploads `TestResults` (blame sequence + hang dumps) on failure
 should anything recur.
+
+## Open, found by reading: eleven defects a survey turned up
+
+A read-through of the tree on 2026-08-02 —
+`Messages`, `Algo` and its storage layer, `Algo.Strategies`,
+`Algo.Testing`, `MatchingEngine`, the entity projects, and `Tests` —
+found these.
+None is reproduced by a failing test,
+and none is fixed;
+each carries the file and line that supports it
+so the next reader can start from evidence rather than from this summary.
+They are ordered by consequence.
+
+**A flush failure discards buffered market data.**
+`Algo/Storages/BufferMessageAdapter.cs:277-456`
+drains each buffer with a `Get()`-and-clear
+(`StorageBuffer.cs:16-22`) before persisting,
+and wraps the whole cycle in one log-only `try`/`catch`.
+One `SaveAsync` throw therefore drops every message already dequeued in
+that cycle, including other securities pulled by the same call.
+Three bare `catch { }` sit beside it at `:473,479,485`,
+and `StopStorageTimer` (`:462-487`) waits one second for the flush task
+before disposing its cancellation source,
+leaving a slow flush running detached.
+
+**`MaxMessageCount` does nothing.**
+`Algo.Testing/HistoryEmulationConnector.cs:255-267` —
+the getter returns `-1` and the setter body is commented out under a
+bare `// TODO`.
+`Algo.Strategies/Optimization/BaseOptimizer.cs:553` sets it on every
+backtest connector it builds, and `OptimizerSettings` persists it,
+so a user-facing optimizer setting silently has no effect.
+
+**A login containing `*` or `\` cannot find itself.**
+`Configuration/Permissions/PermissionCredentialsExtensions.cs:78-95`
+escapes a literal `*` as `\*` before calling
+`FileCredentialsStorage.SearchAsync` (`:61-64`),
+which applies `Regex.Escape(...).Replace("\*", ".*")` to the result and
+consumes the wrong pair.
+The lookup misses the real login and can match an unrelated one
+containing a backslash.
+
+**The decomposed strategy no longer defers subscribes.**
+`Algo.Strategies/SubscriptionRegistry.cs:16,42-64,107-127` implements
+`SuspendRules`/`ResumeRules`/`IsRulesSuspended`,
+and nothing calls them outside their own unit test.
+In the monolith one shared counter gated both rule activation and the
+wire-level subscribe (`Legacy/StrategyOld_SubscriptionProvider.cs:133-141,168-177`);
+`Strategy`'s container (`Strategy_MarketRulesAndMisc.cs:106-119`) touches
+only its own counter.
+So `SuspendRules(() => { ... Subscribe ... })` at
+`Quoting/QuotingProcessor.cs:141-146` no longer defers the subscribe,
+and no equivalence test covers the difference.
+
+**Price-time priority rests on dictionary order.**
+`MatchingEngine/OrderBook.cs:8,15` holds each book level as a
+`Dictionary<long, EmulatorOrder>`,
+and `ConsumeVolume` (`:444`) walks that order to decide which same-price
+orders fill first.
+For a matching engine that is a contract rather than an implementation
+detail, and `OrderMatcherTests`/`OrderBookTests` do not pin it.
+
+**`GetActiveOrders` ignores its security.**
+`MatchingEngine/IOrderLifecycleManager.cs:180-185` returns every active
+order whatever `SecurityId` it is given —
+its own comment concedes orders do not carry one.
+The single caller (`MatchingEngineAdapter.cs:1138`) is correct only
+because it reaches a manager already scoped per security,
+which is caller topology rather than a guarantee,
+and no test exercises the overload.
+
+**Shared state mutated outside its lock.**
+`Algo/Connector_SubscriptionManager.cs:317-321` adds to `_notFound`
+without holding `_syncObject`, from two paths that have already left it
+(`:349-350`, `:482`), while every sibling collection in the class is
+guarded.
+`Algo/EntityCache.cs:962-974` does a non-atomic read-modify-write on
+`_ordersAvgPrices`.
+Both are masked today by the single-consumer loop in
+`InMemoryMessageChannel`, which nothing enforces.
+`Localization/LocalizedStrings.cs:45-46,124-143,180-208` is the same
+shape without the mask: plain collections written by `AddLanguage` and
+`ActiveLanguage` while `GetString` reads them.
+
+**A test mints duplicate transaction ids.**
+`Tests/StrategyPositionManagerTests.cs:6` increments a
+`private static long _tx` with `++_tx` at 15 sites.
+The class is not `[DoNotParallelize]` and the assembly runs
+`Parallelize(MethodLevel)` (`Tests/Properties/AssemblyInfo.cs:12`),
+so two of its methods can hand the same id to fixtures meant to be
+independent.
+
+**Cancellation paths swallow every error silently.**
+`Messages/IMessageAdapterAsyncExtensions.cs:202-213` and `:451-472`
+catch and discard, holding an `ILogReceiver` the whole time.
+`Messages/AsyncMessageChannel.cs:104,116,120,128` has four bare
+`catch { }` in `Close()`, in a class that logs everywhere else.
+
+**Nothing guards message cloning.**
+Every `Message` subtype hand-writes `Clone`/`CopyTo`
+(`Messages/Message.cs:115-130` and each subclass),
+so a field added without touching both vanishes on clone with no test
+failing.
+`MessageTypes` compounds it: the enum carries no explicit values, so
+member order is wire identity, and 31 obsolete members are retained
+only to hold later ordinals.
+
+**Storage I/O claims to be async and is not.**
+`Algo/Storages/LocalMarketDataDrive.cs:156-191` —
+`SaveStreamAsync` and `LoadStreamAsync` call blocking `OpenWrite`,
+`Open` and `CopyTo` on an `IFileSystem` whose real async members the
+same file uses at `:985`.
