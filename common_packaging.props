@@ -10,9 +10,9 @@
     so the packages are drop-in:
     the PackageReference id in consuming projects is the single difference.
 
-    The default prefix "SSharp" (after the platform's own "S#" short name)
-    is a deliberate placeholder decision.
-    Rebrand any time with:
+    The default prefix "StockShark" is the fork's package brand
+    (decision record 0004).
+    Override per pack with:
 
       dotnet pack StockSharp.slnx -c Release -p:ForkPackagePrefix=YourBrand
 
@@ -21,7 +21,7 @@
     and is bumped per fork release, independently of upstream's package feeds.
   -->
   <PropertyGroup>
-    <ForkPackagePrefix Condition="'$(ForkPackagePrefix)' == ''">SSharp</ForkPackagePrefix>
+    <ForkPackagePrefix Condition="'$(ForkPackagePrefix)' == ''">StockShark</ForkPackagePrefix>
     <ForkPackageVersion Condition="'$(ForkPackageVersion)' == ''">5.0.0</ForkPackageVersion>
     <ForkRepositoryUrl Condition="'$(ForkRepositoryUrl)' == ''">https://github.com/johnjohnson-root/StockSharp</ForkRepositoryUrl>
 

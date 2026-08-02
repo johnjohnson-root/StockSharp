@@ -4,7 +4,7 @@
 #
 #   ./tools/pack.sh [output-dir]      # default: ./artifacts/nupkgs
 #
-# Package ids default to SSharp.* (rebrand with -p:ForkPackagePrefix=...),
+# Package ids default to StockShark.* (rebrand with -p:ForkPackagePrefix=...),
 # and assembly names and namespaces stay StockSharp.*,
 # so switching a consumer from upstream packages to these
 # is a PackageReference-id change alone.

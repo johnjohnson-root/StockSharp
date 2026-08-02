@@ -1,7 +1,7 @@
 name: Pack
 
 # Builds the fork-branded NuGet packages
-# (SSharp.* by default, see common_packaging.props)
+# (StockShark.* by default, see common_packaging.props)
 # and uploads them as a CI artifact.
 # Publishing to a feed stays a deliberate, manual step:
 # download the artifact and push it with `dotnet nuget push`.

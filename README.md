@@ -49,7 +49,7 @@ or run the `Mirror packages` GitHub workflow to produce it as a CI artifact.
 `./tools/pack.sh` (or the `Pack` GitHub workflow)
 builds NuGet packages for every library in `StockSharp.slnx`
 under fork-branded ids —
-`SSharp.*` by default,
+`StockShark.*` by default,
 configurable via `-p:ForkPackagePrefix=...` (see `common_packaging.props`).
 Assembly names and namespaces remain `StockSharp.*`,
 so switching a consumer from upstream packages to these
